@@ -68,6 +68,24 @@ const Storage = (() => {
         }
         data.activeTripId = trip.id;
         saveAll(data);
+
+        // Auto-sync to server if this trip has been shared
+        if (trip.shareId) {
+            syncSharedTrip(trip);
+        }
+    }
+
+    // Debounced sync to avoid flooding the server on rapid edits
+    let syncTimer = null;
+    function syncSharedTrip(trip) {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => {
+            fetch('/api/share', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(trip),
+            }).catch(() => { /* silent fail for background sync */ });
+        }, 2000);
     }
 
     function deleteTrip(tripId) {
@@ -125,7 +143,13 @@ const Storage = (() => {
             body: JSON.stringify(trip),
         });
         if (!res.ok) throw new Error('Share failed');
-        return res.json();
+        const result = await res.json();
+        // Persist the shareId on the trip so future shares reuse the same link
+        if (!trip.shareId) {
+            trip.shareId = result.shareId;
+            saveTrip(trip);
+        }
+        return result;
     }
 
     async function loadSharedTrip(shareId) {
@@ -133,8 +157,9 @@ const Storage = (() => {
         if (!res.ok) throw new Error('Shared trip not found');
         const data = await res.json();
         const trip = data.trip;
-        // Assign new ID to avoid conflicts
+        // Assign new ID and clear shareId to avoid conflicts
         trip.id = generateId();
+        delete trip.shareId;
         const store = getAll();
         store.trips.push(trip);
         store.activeTripId = trip.id;

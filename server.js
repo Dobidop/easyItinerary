@@ -80,9 +80,21 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
-            // Generate a short share ID
-            const shareId = crypto.randomBytes(4).toString('hex');
+            // Reuse existing shareId if the trip already has one, otherwise generate new
+            let shareId = trip.shareId;
+            if (shareId && /^[a-f0-9]+$/.test(shareId)) {
+                // Validate the existing shareId format
+            } else {
+                shareId = crypto.randomBytes(4).toString('hex');
+            }
             const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+
+            // Prevent traversal with reused IDs
+            const normalized = path.normalize(filePath);
+            if (!normalized.startsWith(SHARED_DIR)) {
+                sendJson(res, 403, { error: 'Forbidden' });
+                return;
+            }
 
             // Save with metadata
             const shared = {
@@ -92,7 +104,8 @@ const server = http.createServer(async (req, res) => {
             };
 
             fs.writeFileSync(filePath, JSON.stringify(shared, null, 2));
-            console.log(`Shared trip "${trip.name}" as ${shareId}`);
+            const isUpdate = trip.shareId === shareId;
+            console.log(`${isUpdate ? 'Updated' : 'Shared'} trip "${trip.name}" as ${shareId}`);
 
             sendJson(res, 200, { shareId, url: `/?trip=${shareId}` });
         } catch (err) {
