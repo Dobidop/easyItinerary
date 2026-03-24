@@ -172,6 +172,7 @@
                         <div class="budget-bar-container">
                             <div class="budget-bar" id="budgetBar"></div>
                         </div>
+                        <div class="budget-breakdown" id="budgetBreakdown"></div>
                     </div>
 
                     <!-- Category breakdown chart -->
@@ -235,6 +236,12 @@
                 <button class="modal-close" data-close="activityModal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
+                <div class="form-group">
+                    <label>Link a saved resource (optional)</label>
+                    <select id="activityLinkedResource" class="linked-resource-select">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
                 <div class="form-row">
                     <div class="form-group flex-1">
                         <label>Title</label>
@@ -428,10 +435,16 @@
     <div class="modal-overlay" id="reservationModal">
         <div class="modal">
             <div class="modal-header">
-                <h3>Add Reservation</h3>
+                <h3 id="reservationModalTitle">Add Reservation</h3>
                 <button class="modal-close" data-close="reservationModal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
+                <div class="form-group">
+                    <label>Link a saved resource (optional)</label>
+                    <select id="reservationLinkedResource" class="linked-resource-select">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Type</label>
@@ -471,6 +484,16 @@
                     <div class="form-group">
                         <label>Cost</label>
                         <input type="number" id="reservationCost" placeholder="0" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="form-row reservation-dates-row" id="reservationDatesRow" style="display:none">
+                    <div class="form-group">
+                        <label>Check-in</label>
+                        <input type="date" id="reservationCheckIn" />
+                    </div>
+                    <div class="form-group">
+                        <label>Check-out</label>
+                        <input type="date" id="reservationCheckOut" />
                     </div>
                 </div>
                 <div class="form-group">

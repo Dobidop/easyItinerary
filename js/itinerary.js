@@ -19,6 +19,47 @@ const Itinerary = (() => {
                 document.getElementById('activityLng').value = lng.toFixed(6);
             });
         });
+
+        // Resource linker for activities
+        document.getElementById('activityLinkedResource').addEventListener('change', () => {
+            const idx = document.getElementById('activityLinkedResource').value;
+            if (idx === '') return;
+            const res = currentTrip.resources[parseInt(idx)];
+            if (!res) return;
+
+            if (!document.getElementById('activityTitle').value.trim()) {
+                document.getElementById('activityTitle').value = res.title;
+            }
+            if (res.url && !document.getElementById('activityLink').value.trim()) {
+                document.getElementById('activityLink').value = res.url;
+            }
+            if (res.notes && !document.getElementById('activityDescription').value.trim()) {
+                document.getElementById('activityDescription').value = res.notes;
+            }
+            if (res.lat && !document.getElementById('activityLat').value) {
+                document.getElementById('activityLat').value = res.lat;
+            }
+            if (res.lng && !document.getElementById('activityLng').value) {
+                document.getElementById('activityLng').value = res.lng;
+            }
+
+            // Map resource category to activity category
+            const catMap = { restaurant: 'food', hotel: 'lodging', transport: 'transport', activity: 'activity' };
+            if (catMap[res.category]) {
+                document.getElementById('activityCategory').value = catMap[res.category];
+            }
+        });
+    }
+
+    function populateActivityResources() {
+        const select = document.getElementById('activityLinkedResource');
+        select.innerHTML = '<option value="">— None —</option>';
+        (currentTrip.resources || []).forEach((res, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
+            select.appendChild(opt);
+        });
     }
 
     function generateDaysFromDates() {
@@ -78,6 +119,8 @@ const Itinerary = (() => {
         const modal = document.getElementById('activityModal');
         const title = document.getElementById('activityModalTitle');
 
+        populateActivityResources();
+
         if (actIdx !== null && actIdx !== undefined) {
             title.textContent = 'Edit Activity';
             const act = currentTrip.days[dayIdx].activities[actIdx];
@@ -91,6 +134,7 @@ const Itinerary = (() => {
             document.getElementById('activityAddress').value = act.address || '';
             document.getElementById('activityLat').value = act.lat || '';
             document.getElementById('activityLng').value = act.lng || '';
+            document.getElementById('activityLinkedResource').value = act.linkedResourceIdx !== undefined ? act.linkedResourceIdx : '';
         } else {
             title.textContent = 'Add Activity';
             document.getElementById('activityTitle').value = '';
@@ -103,6 +147,7 @@ const Itinerary = (() => {
             document.getElementById('activityAddress').value = '';
             document.getElementById('activityLat').value = '';
             document.getElementById('activityLng').value = '';
+            document.getElementById('activityLinkedResource').value = '';
         }
         modal.classList.add('open');
     }
@@ -128,6 +173,7 @@ const Itinerary = (() => {
             address: document.getElementById('activityAddress').value,
             lat: parseFloat(document.getElementById('activityLat').value) || null,
             lng: parseFloat(document.getElementById('activityLng').value) || null,
+            linkedResourceIdx: document.getElementById('activityLinkedResource').value || null,
         };
 
         if (actIdx !== null && actIdx !== undefined) {
@@ -136,12 +182,27 @@ const Itinerary = (() => {
             currentTrip.days[dayIdx].activities.push(activity);
         }
 
+        // Sort activities by start time (activities without time go to end)
+        sortActivitiesByTime(currentTrip.days[dayIdx].activities);
+
         Storage.saveTrip(currentTrip);
         document.getElementById('activityModal').classList.remove('open');
         editingActivity = null;
         render();
         App.updateStats();
+        Budget.update(currentTrip);
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
+    }
+
+    function sortActivitiesByTime(activities) {
+        activities.sort((a, b) => {
+            // Activities with start time come first, sorted by time
+            // Activities without start time keep their relative order at the end
+            if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+            if (a.startTime && !b.startTime) return -1;
+            if (!a.startTime && b.startTime) return 1;
+            return 0;
+        });
     }
 
     function deleteActivity(dayIdx, actIdx) {
@@ -150,6 +211,7 @@ const Itinerary = (() => {
         Storage.saveTrip(currentTrip);
         render();
         App.updateStats();
+        Budget.update(currentTrip);
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
     }
 

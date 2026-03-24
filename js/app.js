@@ -197,6 +197,11 @@ const App = (() => {
         // Reservations
         document.getElementById('btnAddReservation').addEventListener('click', () => openReservationModal(null));
         document.getElementById('btnSaveReservation').addEventListener('click', saveReservation);
+        document.getElementById('reservationType').addEventListener('change', () => {
+            toggleReservationDates();
+            populateReservationResources();
+        });
+        document.getElementById('reservationLinkedResource').addEventListener('change', onReservationResourceSelected);
 
         // Checklist
         document.getElementById('btnAddChecklist').addEventListener('click', addChecklistItem);
@@ -263,11 +268,64 @@ const App = (() => {
     // ===== Reservations =====
     let editingReservationIdx = null;
 
+    function populateReservationResources() {
+        const select = document.getElementById('reservationLinkedResource');
+        const type = document.getElementById('reservationType').value;
+        select.innerHTML = '<option value="">— None —</option>';
+
+        // Map reservation types to resource categories
+        const categoryMap = {
+            hotel: ['hotel'],
+            flight: ['transport'],
+            train: ['transport'],
+            bus: ['transport'],
+            rental: ['transport'],
+            other: [],
+        };
+        const matchCategories = categoryMap[type] || [];
+
+        (currentTrip.resources || []).forEach((res, idx) => {
+            // Show matching resources first, but include all
+            const match = matchCategories.length === 0 || matchCategories.includes(res.category);
+            const prefix = match ? '' : '';
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
+            if (match) opt.style.fontWeight = '600';
+            select.appendChild(opt);
+        });
+    }
+
+    function onReservationResourceSelected() {
+        const idx = document.getElementById('reservationLinkedResource').value;
+        if (idx === '') return;
+        const res = currentTrip.resources[parseInt(idx)];
+        if (!res) return;
+
+        if (!document.getElementById('reservationTitle').value.trim()) {
+            document.getElementById('reservationTitle').value = res.title;
+        }
+        if (res.url && !document.getElementById('reservationLink').value.trim()) {
+            document.getElementById('reservationLink').value = res.url;
+        }
+        if (res.notes && !document.getElementById('reservationNotes').value.trim()) {
+            document.getElementById('reservationNotes').value = res.notes;
+        }
+    }
+
+    function toggleReservationDates() {
+        const type = document.getElementById('reservationType').value;
+        const row = document.getElementById('reservationDatesRow');
+        row.style.display = type === 'hotel' ? 'flex' : 'none';
+    }
+
     function openReservationModal(idx) {
         editingReservationIdx = idx;
         const modal = document.getElementById('reservationModal');
+        const title = document.getElementById('reservationModalTitle');
 
         if (idx !== null && idx !== undefined) {
+            title.textContent = 'Edit Reservation';
             const res = currentTrip.reservations[idx];
             document.getElementById('reservationType').value = res.type || 'other';
             document.getElementById('reservationTitle').value = res.title || '';
@@ -278,7 +336,11 @@ const App = (() => {
             document.getElementById('reservationCost').value = res.cost || '';
             document.getElementById('reservationNotes').value = res.notes || '';
             document.getElementById('reservationLink').value = res.link || '';
+            document.getElementById('reservationCheckIn').value = res.checkIn || '';
+            document.getElementById('reservationCheckOut').value = res.checkOut || '';
+            document.getElementById('reservationLinkedResource').value = res.linkedResourceIdx !== undefined ? res.linkedResourceIdx : '';
         } else {
+            title.textContent = 'Add Reservation';
             document.getElementById('reservationType').value = 'flight';
             document.getElementById('reservationTitle').value = '';
             document.getElementById('reservationProvider').value = '';
@@ -288,7 +350,12 @@ const App = (() => {
             document.getElementById('reservationCost').value = '';
             document.getElementById('reservationNotes').value = '';
             document.getElementById('reservationLink').value = '';
+            document.getElementById('reservationCheckIn').value = '';
+            document.getElementById('reservationCheckOut').value = '';
+            document.getElementById('reservationLinkedResource').value = '';
         }
+        populateReservationResources();
+        toggleReservationDates();
         modal.classList.add('open');
     }
 
@@ -299,9 +366,10 @@ const App = (() => {
             return;
         }
 
+        const type = document.getElementById('reservationType').value;
         const reservation = {
             id: editingReservationIdx !== null ? currentTrip.reservations[editingReservationIdx].id : Storage.generateId(),
-            type: document.getElementById('reservationType').value,
+            type,
             title,
             provider: document.getElementById('reservationProvider').value,
             confirmation: document.getElementById('reservationConfirmation').value,
@@ -310,6 +378,9 @@ const App = (() => {
             cost: parseFloat(document.getElementById('reservationCost').value) || 0,
             notes: document.getElementById('reservationNotes').value,
             link: document.getElementById('reservationLink').value,
+            checkIn: type === 'hotel' ? document.getElementById('reservationCheckIn').value : '',
+            checkOut: type === 'hotel' ? document.getElementById('reservationCheckOut').value : '',
+            linkedResourceIdx: document.getElementById('reservationLinkedResource').value || null,
         };
 
         if (editingReservationIdx !== null) {
@@ -322,6 +393,8 @@ const App = (() => {
         document.getElementById('reservationModal').classList.remove('open');
         editingReservationIdx = null;
         renderReservations();
+        Budget.update(currentTrip);
+        updateStats();
     }
 
     function deleteReservation(idx) {
@@ -329,6 +402,8 @@ const App = (() => {
         currentTrip.reservations.splice(idx, 1);
         Storage.saveTrip(currentTrip);
         renderReservations();
+        Budget.update(currentTrip);
+        updateStats();
     }
 
     function renderReservations() {
@@ -350,6 +425,16 @@ const App = (() => {
         container.innerHTML = currentTrip.reservations.map((res, idx) => {
             const t = typeIcons[res.type] || typeIcons.other;
             const sym = Budget.getCurrencySymbol(currentTrip.budgetCurrency);
+
+            // Build date display
+            let dateDisplay = '';
+            if (res.type === 'hotel' && res.checkIn && res.checkOut) {
+                const nights = Math.ceil((new Date(res.checkOut) - new Date(res.checkIn)) / (1000*60*60*24));
+                dateDisplay = `<span><i class="fa-regular fa-calendar"></i> ${res.checkIn} → ${res.checkOut}${nights > 0 ? ` (${nights} night${nights !== 1 ? 's' : ''})` : ''}</span>`;
+            } else if (res.date) {
+                dateDisplay = `<span><i class="fa-regular fa-calendar"></i> ${res.date}</span>`;
+            }
+
             return `
                 <div class="reservation-card">
                     <div class="reservation-icon ${t.class}"><i class="fa-solid ${t.icon}"></i></div>
@@ -357,7 +442,7 @@ const App = (() => {
                         <h4>${escapeHtml(res.title)}</h4>
                         <div class="reservation-meta">
                             ${res.provider ? `<span>${escapeHtml(res.provider)}</span>` : ''}
-                            ${res.date ? `<span><i class="fa-regular fa-calendar"></i> ${res.date}</span>` : ''}
+                            ${dateDisplay}
                             ${res.time ? `<span><i class="fa-regular fa-clock"></i> ${res.time}</span>` : ''}
                             ${res.cost ? `<span>${sym}${res.cost}</span>` : ''}
                         </div>

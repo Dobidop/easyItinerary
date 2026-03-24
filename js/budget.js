@@ -106,15 +106,51 @@ const Budget = (() => {
     }
 
     function getTotalSpent() {
+        return getExpenseTotal() + getReservationTotal() + getActivityTotal();
+    }
+
+    function getExpenseTotal() {
         return currentTrip.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    }
+
+    function getReservationTotal() {
+        return (currentTrip.reservations || []).reduce((sum, r) => sum + (r.cost || 0), 0);
+    }
+
+    function getActivityTotal() {
+        return (currentTrip.days || []).reduce((daySum, day) =>
+            daySum + day.activities.reduce((actSum, act) => actSum + (act.cost || 0), 0), 0);
     }
 
     function getCategoryTotals() {
         const totals = {};
+
+        // Manual expenses
         currentTrip.expenses.forEach(e => {
             const cat = e.category || 'other';
             totals[cat] = (totals[cat] || 0) + (e.amount || 0);
         });
+
+        // Reservation costs — map to budget categories
+        const resCatMap = { flight: 'transport', train: 'transport', bus: 'transport', rental: 'transport', hotel: 'accommodation', other: 'other' };
+        (currentTrip.reservations || []).forEach(r => {
+            if (r.cost) {
+                const cat = resCatMap[r.type] || 'other';
+                totals[cat] = (totals[cat] || 0) + r.cost;
+            }
+        });
+
+        // Activity costs — map to budget categories
+        const actCatMap = { food: 'food', sightseeing: 'activities', activity: 'activities', transport: 'transport', lodging: 'accommodation', shopping: 'shopping', other: 'other' };
+        (currentTrip.days || []).forEach(day => {
+            day.activities.forEach(act => {
+                if (act.cost) {
+                    const cat = actCatMap[act.category] || 'other';
+                    totals[cat] = (totals[cat] || 0) + act.cost;
+                }
+            });
+        });
+
         return totals;
     }
 
@@ -137,6 +173,21 @@ const Budget = (() => {
         const pct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
         bar.style.width = pct + '%';
         bar.classList.toggle('over-budget', spent > total && total > 0);
+
+        // Render cost breakdown by source
+        const expTotal = getExpenseTotal();
+        const resTotal = getReservationTotal();
+        const actTotal = getActivityTotal();
+        const breakdownEl = document.getElementById('budgetBreakdown');
+        if (breakdownEl) {
+            const fmt = (v) => `${sym}${v.toFixed(v % 1 === 0 ? 0 : 2)}`;
+            breakdownEl.innerHTML = `
+                <div class="budget-breakdown-item"><span>Manual expenses</span><span>${fmt(expTotal)}</span></div>
+                ${resTotal > 0 ? `<div class="budget-breakdown-item"><span>Reservations</span><span>${fmt(resTotal)}</span></div>` : ''}
+                ${actTotal > 0 ? `<div class="budget-breakdown-item"><span>Activity costs</span><span>${fmt(actTotal)}</span></div>` : ''}
+                <div class="budget-breakdown-item total"><span>Total spent</span><span>${fmt(spent)}</span></div>
+            `;
+        }
     }
 
     function renderChart() {
@@ -229,6 +280,9 @@ const Budget = (() => {
         saveExpense,
         deleteExpense,
         getTotalSpent,
+        getExpenseTotal,
+        getReservationTotal,
+        getActivityTotal,
         getCurrencySymbol,
     };
 })();
