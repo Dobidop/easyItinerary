@@ -7,6 +7,8 @@ const MapModule = (() => {
     let pickCallback = null;
     let searchTimeout = null;
     let currentTileLayer = null;
+    let routeLine = null;
+    let routeEnabled = false;
 
     const tileSets = {
         dark: {
@@ -372,8 +374,9 @@ const MapModule = (() => {
         return marker;
     }
 
-    function updateMarkers(trip, dayFilter) {
+    function updateMarkers(trip, dayFilter, skipFitBounds) {
         clearMarkers();
+        removeRouteLine();
         if (!trip) return;
 
         // Add activity markers
@@ -384,8 +387,10 @@ const MapModule = (() => {
                 if (act.lat && act.lng) {
                     const timeStr = act.startTime ? `<p><i class="fa-regular fa-clock"></i> ${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}</p>` : '';
                     const linkStr = act.link ? `<p><a href="${escapeHtml(act.link)}" target="_blank">Open link</a></p>` : '';
+                    const dayLabel = dayFilter === 'all' ? `<p style="font-size:11px;color:var(--text-muted)">Day ${dayIdx + 1}</p>` : '';
                     const popup = `
                         <h4>${escapeHtml(act.title)}</h4>
+                        ${dayLabel}
                         ${timeStr}
                         <p>${escapeHtml(act.description || '')}</p>
                         ${act.address ? `<p><i class="fa-solid fa-location-dot"></i> ${escapeHtml(act.address)}</p>` : ''}
@@ -397,19 +402,28 @@ const MapModule = (() => {
             });
         });
 
-        // Add resource markers
-        trip.resources.forEach((res) => {
-            if (res.lat && res.lng) {
-                const popup = `
-                    <h4>${escapeHtml(res.title)}</h4>
-                    ${res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.url)}</a></p>` : ''}
-                    ${res.notes ? `<p>${escapeHtml(res.notes)}</p>` : ''}
-                `;
-                addMarker(res.lat, res.lng, popup, res.category);
-            }
-        });
+        // Add resource markers (only when showing all days, or always but dimmed)
+        if (dayFilter === 'all') {
+            trip.resources.forEach((res) => {
+                if (res.lat && res.lng) {
+                    const popup = `
+                        <h4>${escapeHtml(res.title)}</h4>
+                        ${res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.url)}</a></p>` : ''}
+                        ${res.notes ? `<p>${escapeHtml(res.notes)}</p>` : ''}
+                    `;
+                    addMarker(res.lat, res.lng, popup, res.category);
+                }
+            });
+        }
 
-        fitBounds();
+        // Draw route line if enabled
+        if (routeEnabled) {
+            drawRouteLine(trip, dayFilter);
+        }
+
+        if (!skipFitBounds) {
+            fitBounds();
+        }
     }
 
     function fitBounds() {
@@ -431,6 +445,66 @@ const MapModule = (() => {
 
     function invalidateSize() {
         if (map) map.invalidateSize();
+    }
+
+    /* ===== Route line ===== */
+    function drawRouteLine(trip, dayFilter) {
+        removeRouteLine();
+        if (!trip) return;
+
+        const points = [];
+        trip.days.forEach((day, dayIdx) => {
+            if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
+            // Activities are already sorted by time within each day
+            day.activities.forEach(act => {
+                if (act.lat && act.lng) {
+                    points.push([act.lat, act.lng]);
+                }
+            });
+        });
+
+        if (points.length < 2) return;
+
+        routeLine = L.polyline(points, {
+            color: 'var(--accent)',
+            weight: 2.5,
+            opacity: 0.7,
+            dashArray: '8, 8',
+            className: 'route-line',
+        }).addTo(map);
+
+        // Use a fixed color since CSS vars don't work in SVG
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const colors = { dark: '#4f8cff', light: '#3b6de0', nord: '#88c0d0', warm: '#d97b3d' };
+        routeLine.setStyle({ color: colors[theme] || '#4f8cff' });
+    }
+
+    function removeRouteLine() {
+        if (routeLine) {
+            map.removeLayer(routeLine);
+            routeLine = null;
+        }
+    }
+
+    function toggleRoute() {
+        routeEnabled = !routeEnabled;
+        const btn = document.getElementById('btnToggleRoute');
+        btn.classList.toggle('active', routeEnabled);
+        // Re-render markers to add/remove route
+        const filter = document.getElementById('mapDayFilter').value;
+        const trip = getCurrentTrip();
+        if (trip) {
+            if (routeEnabled) {
+                drawRouteLine(trip, filter);
+            } else {
+                removeRouteLine();
+            }
+        }
+    }
+
+    function getCurrentTrip() {
+        // Get from Storage since we don't store trip ref in MapModule
+        return Storage.getActiveTrip();
     }
 
     function setTileLayer(theme) {
@@ -464,6 +538,7 @@ const MapModule = (() => {
         panTo,
         invalidateSize,
         addSearchResultAsResource,
+        toggleRoute,
         setTileLayer,
         getMap,
     };

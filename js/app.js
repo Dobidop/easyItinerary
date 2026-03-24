@@ -99,7 +99,12 @@ const App = (() => {
 
         // Map day filter
         document.getElementById('mapDayFilter').addEventListener('change', (e) => {
-            MapModule.updateMarkers(currentTrip, e.target.value);
+            MapModule.updateMarkers(currentTrip, e.target.value, false);
+        });
+
+        // Route toggle
+        document.getElementById('btnToggleRoute').addEventListener('click', () => {
+            MapModule.toggleRoute();
         });
 
         // Fit map button
@@ -430,7 +435,18 @@ const App = (() => {
             other: { icon: 'fa-ellipsis', class: 'other' },
         };
 
-        container.innerHTML = currentTrip.reservations.map((res, idx) => {
+        // Sort by date (check-in for hotels, date for others), then by time
+        const sorted = currentTrip.reservations
+            .map((res, idx) => ({ ...res, _idx: idx }))
+            .sort((a, b) => {
+                const dateA = (a.type === 'hotel' && a.checkIn) ? a.checkIn : (a.date || '');
+                const dateB = (b.type === 'hotel' && b.checkIn) ? b.checkIn : (b.date || '');
+                if (dateA !== dateB) return dateA.localeCompare(dateB);
+                return (a.time || '').localeCompare(b.time || '');
+            });
+
+        container.innerHTML = sorted.map((res) => {
+            const idx = res._idx;
             const t = typeIcons[res.type] || typeIcons.other;
             const sym = Budget.getCurrencySymbol(currentTrip.budgetCurrency);
 
