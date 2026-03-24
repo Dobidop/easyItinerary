@@ -6,6 +6,26 @@ const MapModule = (() => {
     let pickMode = false;
     let pickCallback = null;
     let searchTimeout = null;
+    let currentTileLayer = null;
+
+    const tileSets = {
+        dark: {
+            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        },
+        light: {
+            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        },
+        nord: {
+            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        },
+        warm: {
+            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        },
+    };
 
     const categoryIcons = {
         sightseeing: 'fa-camera',
@@ -28,11 +48,9 @@ const MapModule = (() => {
             zoomControl: true,
         });
 
-        // Dark map tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            maxZoom: 19,
-        }).addTo(map);
+        // Map tiles — set based on current theme
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        setTileLayer(theme);
 
         // Click handler for pick-on-map
         map.on('click', (e) => {
@@ -413,6 +431,17 @@ const MapModule = (() => {
         if (map) map.invalidateSize();
     }
 
+    function setTileLayer(theme) {
+        const tiles = tileSets[theme] || tileSets.dark;
+        if (currentTileLayer) {
+            map.removeLayer(currentTileLayer);
+        }
+        currentTileLayer = L.tileLayer(tiles.url, {
+            attribution: tiles.attribution,
+            maxZoom: 19,
+        }).addTo(map);
+    }
+
     function getMap() {
         return map;
     }
@@ -433,6 +462,7 @@ const MapModule = (() => {
         panTo,
         invalidateSize,
         addSearchResultAsResource,
+        setTileLayer,
         getMap,
     };
 })();

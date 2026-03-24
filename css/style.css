@@ -1,5 +1,29 @@
 /* ===== CSS Custom Properties ===== */
 :root {
+    --radius: 8px;
+    --radius-sm: 5px;
+    --radius-lg: 12px;
+
+    /* Category colors — shared across all themes */
+    --cat-sightseeing: #4f8cff;
+    --cat-food: #ff8c42;
+    --cat-transport: #a78bfa;
+    --cat-lodging: #34d399;
+    --cat-activity: #f472b6;
+    --cat-shopping: #fbbf24;
+    --cat-other: #94a3b8;
+
+    /* Budget category colors */
+    --bcat-transport: #a78bfa;
+    --bcat-accommodation: #34d399;
+    --bcat-food: #ff8c42;
+    --bcat-activities: #f472b6;
+    --bcat-shopping: #fbbf24;
+    --bcat-other: #94a3b8;
+}
+
+/* ===== Dark Theme (default) ===== */
+[data-theme="dark"], :root {
     --bg-primary: #1a1a2e;
     --bg-secondary: #16213e;
     --bg-card: #1e2a45;
@@ -18,26 +42,85 @@
     --border: #2d3a58;
     --border-light: #354063;
     --shadow: rgba(0, 0, 0, 0.3);
-    --radius: 8px;
-    --radius-sm: 5px;
-    --radius-lg: 12px;
+    --marker-border: #fff;
+    --popup-link: var(--accent);
+}
 
-    /* Category colors */
-    --cat-sightseeing: #4f8cff;
-    --cat-food: #ff8c42;
-    --cat-transport: #a78bfa;
-    --cat-lodging: #34d399;
-    --cat-activity: #f472b6;
-    --cat-shopping: #fbbf24;
-    --cat-other: #94a3b8;
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+    --bg-primary: #f5f6fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-input: #eef0f6;
+    --bg-hover: #e8ebf2;
+    --text-primary: #1e2028;
+    --text-secondary: #5a5e72;
+    --text-muted: #9196ab;
+    --accent: #3b6de0;
+    --accent-hover: #2d5bc7;
+    --accent-light: rgba(59, 109, 224, 0.10);
+    --danger: #e04848;
+    --danger-hover: #c93a3a;
+    --success: #2ea650;
+    --warning: #e5a218;
+    --border: #d8dbe6;
+    --border-light: #c8ccda;
+    --shadow: rgba(0, 0, 0, 0.08);
+    --marker-border: #fff;
+    --popup-link: var(--accent);
+}
 
-    /* Budget category colors */
-    --bcat-transport: #a78bfa;
-    --bcat-accommodation: #34d399;
-    --bcat-food: #ff8c42;
-    --bcat-activities: #f472b6;
-    --bcat-shopping: #fbbf24;
-    --bcat-other: #94a3b8;
+/* ===== Nord Theme ===== */
+[data-theme="nord"] {
+    --bg-primary: #2e3440;
+    --bg-secondary: #3b4252;
+    --bg-card: #434c5e;
+    --bg-input: #4c566a;
+    --bg-hover: #505b70;
+    --text-primary: #eceff4;
+    --text-secondary: #d8dee9;
+    --text-muted: #7b88a1;
+    --accent: #88c0d0;
+    --accent-hover: #7ab4c4;
+    --accent-light: rgba(136, 192, 208, 0.15);
+    --danger: #bf616a;
+    --danger-hover: #a8525a;
+    --success: #a3be8c;
+    --warning: #ebcb8b;
+    --border: #4c566a;
+    --border-light: #5a6580;
+    --shadow: rgba(0, 0, 0, 0.25);
+    --marker-border: #eceff4;
+    --popup-link: #88c0d0;
+}
+
+/* ===== Warm Theme ===== */
+[data-theme="warm"] {
+    --bg-primary: #faf6f1;
+    --bg-secondary: #fff8f0;
+    --bg-card: #ffffff;
+    --bg-input: #f0ebe4;
+    --bg-hover: #e8e2d9;
+    --text-primary: #2c2520;
+    --text-secondary: #6b5e52;
+    --text-muted: #a09486;
+    --accent: #d97b3d;
+    --accent-hover: #c46a2e;
+    --accent-light: rgba(217, 123, 61, 0.12);
+    --danger: #c94444;
+    --danger-hover: #b33939;
+    --success: #5a9e5a;
+    --warning: #d4a12e;
+    --border: #ddd5ca;
+    --border-light: #cec4b7;
+    --shadow: rgba(0, 0, 0, 0.06);
+    --marker-border: #fff;
+    --popup-link: #d97b3d;
+}
+
+/* Theme-specific marker overrides */
+.numbered-marker, .custom-marker {
+    border-color: var(--marker-border, #fff);
 }
 
 /* ===== Reset & Base ===== */
@@ -104,6 +187,53 @@ body {
     font-size: 13px;
     max-width: 200px;
 }
+
+/* ===== Theme Picker ===== */
+.theme-picker {
+    position: relative;
+}
+.theme-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px var(--shadow);
+    z-index: 200;
+    min-width: 130px;
+    overflow: hidden;
+}
+.theme-dropdown.open { display: block; }
+
+.theme-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 14px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.theme-option:hover { background: var(--bg-hover); }
+.theme-option.active { color: var(--accent); font-weight: 600; }
+
+.theme-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(128, 128, 128, 0.3);
+    flex-shrink: 0;
+}
+.theme-swatch.dark { background: linear-gradient(135deg, #1a1a2e 50%, #4f8cff 50%); }
+.theme-swatch.light { background: linear-gradient(135deg, #f5f6fa 50%, #3b6de0 50%); }
+.theme-swatch.nord { background: linear-gradient(135deg, #2e3440 50%, #88c0d0 50%); }
+.theme-swatch.warm { background: linear-gradient(135deg, #faf6f1 50%, #d97b3d 50%); }
 
 /* ===== Buttons ===== */
 .btn {
@@ -1019,7 +1149,7 @@ body {
     background: var(--bg-secondary);
 }
 
-/* Leaflet overrides for dark theme */
+/* Leaflet overrides — theme-aware */
 .leaflet-container { background: var(--bg-secondary); }
 .leaflet-control-zoom a {
     background: var(--bg-card) !important;
@@ -1037,13 +1167,15 @@ body {
 .leaflet-popup-content h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .leaflet-popup-content p { color: var(--text-secondary); margin: 2px 0; }
 .leaflet-popup-content a { color: var(--accent); }
+.leaflet-control-attribution { background: var(--bg-card) !important; color: var(--text-muted) !important; }
+.leaflet-control-attribution a { color: var(--text-secondary) !important; }
 
 /* Custom map markers */
 .custom-marker {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    border: 3px solid #fff;
+    border: 3px solid var(--marker-border, #fff);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1069,7 +1201,7 @@ body {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    border: 2px solid #fff;
+    border: 2px solid var(--marker-border, #fff);
     display: flex;
     align-items: center;
     justify-content: center;

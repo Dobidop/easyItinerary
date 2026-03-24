@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link rel="stylesheet" href="css/style.css" />
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('easyitinerary-theme') || 'dark');</script>
 </head>
 <body>
     <!-- Top Bar -->
@@ -21,6 +22,15 @@
             <button class="btn btn-sm btn-danger" id="btnDeleteTrip" title="Delete Trip"><i class="fa-solid fa-trash"></i></button>
         </div>
         <div class="top-bar-right">
+            <div class="theme-picker" id="themePicker">
+                <button class="btn btn-sm" id="btnTheme" title="Change theme"><i class="fa-solid fa-palette"></i></button>
+                <div class="theme-dropdown" id="themeDropdown">
+                    <button class="theme-option" data-theme="dark"><span class="theme-swatch dark"></span> Dark</button>
+                    <button class="theme-option" data-theme="light"><span class="theme-swatch light"></span> Light</button>
+                    <button class="theme-option" data-theme="nord"><span class="theme-swatch nord"></span> Nord</button>
+                    <button class="theme-option" data-theme="warm"><span class="theme-swatch warm"></span> Warm</button>
+                </div>
+            </div>
             <button class="btn btn-sm" id="btnExport" title="Export JSON"><i class="fa-solid fa-download"></i> Export</button>
             <button class="btn btn-sm" id="btnImport" title="Import JSON"><i class="fa-solid fa-upload"></i> Import</button>
             <input type="file" id="importFile" accept=".json" style="display:none" />

@@ -3,6 +3,9 @@ const App = (() => {
     let currentTrip = null;
 
     function init() {
+        // Apply saved theme before anything renders
+        initTheme();
+
         currentTrip = Storage.getActiveTrip();
 
         // Init all modules
@@ -18,11 +21,63 @@ const App = (() => {
         setupOverview();
         setupTopBar();
         setupModals();
+        setupThemePicker();
         updateStats();
         MapModule.updateMarkers(currentTrip, 'all');
 
         // Auto-save on input changes in overview
         setupAutoSave();
+    }
+
+    // ===== Theme =====
+    function initTheme() {
+        const saved = localStorage.getItem('easyitinerary-theme') || 'dark';
+        applyTheme(saved);
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('easyitinerary-theme', theme);
+
+        // Update map tiles if map is initialized
+        if (typeof MapModule !== 'undefined' && MapModule.setTileLayer) {
+            try { MapModule.setTileLayer(theme); } catch(e) { /* map not ready yet */ }
+        }
+
+        // Update active state in dropdown
+        document.querySelectorAll('.theme-option').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+    }
+
+    function setupThemePicker() {
+        const btn = document.getElementById('btnTheme');
+        const dropdown = document.getElementById('themeDropdown');
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        });
+
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.addEventListener('click', () => {
+                applyTheme(option.dataset.theme);
+                dropdown.classList.remove('open');
+            });
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.theme-picker')) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // Mark current theme as active
+        const current = localStorage.getItem('easyitinerary-theme') || 'dark';
+        document.querySelectorAll('.theme-option').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === current);
+        });
     }
 
     // ===== Navigation =====
