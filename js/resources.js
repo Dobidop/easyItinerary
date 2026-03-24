@@ -7,8 +7,10 @@ const Resources = (() => {
     const categoryIcons = {
         restaurant: 'fa-utensils',
         hotel: 'fa-bed',
+        sightseeing: 'fa-camera',
         transport: 'fa-plane',
-        activity: 'fa-camera',
+        activity: 'fa-person-hiking',
+        shopping: 'fa-bag-shopping',
         general: 'fa-link',
     };
 

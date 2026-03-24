@@ -22,6 +22,7 @@ const App = (() => {
         setupTopBar();
         setupModals();
         setupThemePicker();
+        anchorDateInputsToTrip();
         updateStats();
         MapModule.updateMarkers(currentTrip, 'all');
 
@@ -302,6 +303,13 @@ const App = (() => {
         const res = currentTrip.resources[parseInt(idx)];
         if (!res) return;
 
+        // Auto-set reservation type based on resource category
+        const catToType = { hotel: 'hotel', transport: 'flight', restaurant: 'other', activity: 'other', general: 'other' };
+        if (catToType[res.category]) {
+            document.getElementById('reservationType').value = catToType[res.category];
+            toggleReservationDates();
+        }
+
         if (!document.getElementById('reservationTitle').value.trim()) {
             document.getElementById('reservationTitle').value = res.title;
         }
@@ -345,13 +353,13 @@ const App = (() => {
             document.getElementById('reservationTitle').value = '';
             document.getElementById('reservationProvider').value = '';
             document.getElementById('reservationConfirmation').value = '';
-            document.getElementById('reservationDate').value = '';
+            document.getElementById('reservationDate').value = currentTrip.startDate || '';
             document.getElementById('reservationTime').value = '';
             document.getElementById('reservationCost').value = '';
             document.getElementById('reservationNotes').value = '';
             document.getElementById('reservationLink').value = '';
-            document.getElementById('reservationCheckIn').value = '';
-            document.getElementById('reservationCheckOut').value = '';
+            document.getElementById('reservationCheckIn').value = currentTrip.startDate || '';
+            document.getElementById('reservationCheckOut').value = currentTrip.endDate || '';
             document.getElementById('reservationLinkedResource').value = '';
         }
         populateReservationResources();
@@ -549,6 +557,41 @@ const App = (() => {
     }
 
     // ===== Helpers =====
+    function anchorDateInputsToTrip() {
+        // For any date input inside a modal that is empty, temporarily set value
+        // to trip start date on focus so the picker opens to the right month,
+        // then clear it on blur if unchanged.
+        document.querySelectorAll('.modal input[type="date"]').forEach(input => {
+            if (input._dateAnchored) return;
+            input._dateAnchored = true;
+
+            input.addEventListener('focus', () => {
+                if (!input.value) {
+                    // For check-out, use check-in date as anchor if available
+                    let anchor = currentTrip.startDate || '';
+                    if (input.id === 'reservationCheckOut') {
+                        const checkIn = document.getElementById('reservationCheckIn').value;
+                        if (checkIn) anchor = checkIn;
+                    }
+                    if (anchor) {
+                        input._wasEmpty = true;
+                        input._anchorValue = anchor;
+                        input.value = anchor;
+                    }
+                } else {
+                    input._wasEmpty = false;
+                }
+            });
+
+            input.addEventListener('blur', () => {
+                if (input._wasEmpty && input.value === input._anchorValue) {
+                    input.value = '';
+                }
+                input._wasEmpty = false;
+            });
+        });
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         const div = document.createElement('div');

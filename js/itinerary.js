@@ -44,7 +44,7 @@ const Itinerary = (() => {
             }
 
             // Map resource category to activity category
-            const catMap = { restaurant: 'food', hotel: 'lodging', transport: 'transport', activity: 'activity' };
+            const catMap = { restaurant: 'food', hotel: 'lodging', sightseeing: 'sightseeing', transport: 'transport', activity: 'activity', shopping: 'shopping' };
             if (catMap[res.category]) {
                 document.getElementById('activityCategory').value = catMap[res.category];
             }
@@ -234,6 +234,18 @@ const Itinerary = (() => {
         return icons[cat] || 'fa-location-dot';
     }
 
+    function getLodgingForDay(dayDate) {
+        if (!dayDate || !currentTrip.reservations) return [];
+        return currentTrip.reservations.filter(r => {
+            if (r.type !== 'hotel') return false;
+            if (r.checkIn && r.checkOut) {
+                return dayDate >= r.checkIn && dayDate <= r.checkOut;
+            }
+            // Fall back to single date
+            return r.date === dayDate;
+        });
+    }
+
     function render() {
         const container = document.getElementById('itineraryDays');
         if (!currentTrip || currentTrip.days.length === 0) {
@@ -250,6 +262,28 @@ const Itinerary = (() => {
         let activityCounter = 1;
         container.innerHTML = currentTrip.days.map((day, dayIdx) => {
             const actCount = day.activities.length;
+
+            // Find lodging reservations that span this day
+            const lodgingHtml = getLodgingForDay(day.date).map(res => {
+                const nights = (res.checkIn && res.checkOut) ? Math.ceil((new Date(res.checkOut) - new Date(res.checkIn)) / (1000*60*60*24)) : 0;
+                const isCheckIn = res.checkIn === day.date;
+                const isCheckOut = res.checkOut === day.date;
+                let label = '';
+                if (isCheckIn) label = 'Check-in';
+                else if (isCheckOut) label = 'Check-out';
+                return `
+                    <div class="lodging-banner">
+                        <i class="fa-solid fa-bed"></i>
+                        <div class="lodging-banner-info">
+                            <span class="lodging-banner-title">${escapeHtml(res.title)}</span>
+                            ${label ? `<span class="lodging-banner-label">${label}</span>` : ''}
+                            ${res.provider ? `<span class="lodging-banner-provider">${escapeHtml(res.provider)}</span>` : ''}
+                        </div>
+                        ${nights > 0 ? `<span class="lodging-banner-nights">${nights}n</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
             const activitiesHtml = day.activities.map((act, actIdx) => {
                 const num = activityCounter++;
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
@@ -295,6 +329,7 @@ const Itinerary = (() => {
                         </div>
                     </div>
                     <div class="day-body">
+                        ${lodgingHtml}
                         <div class="activity-timeline" data-day="${dayIdx}">
                             ${activitiesHtml}
                         </div>

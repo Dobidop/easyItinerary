@@ -330,7 +330,9 @@ const MapModule = (() => {
         if (type === 'restaurant' || type === 'cafe' || type === 'bar' || type === 'pub' || type === 'fast_food') return 'restaurant';
         if (type === 'hotel' || type === 'hostel' || type === 'guest_house' || type === 'motel') return 'hotel';
         if (cls === 'highway' || type === 'bus_station' || type === 'railway' || type === 'aerodrome' || type === 'airport') return 'transport';
-        if (cls === 'tourism' || type === 'museum' || type === 'attraction') return 'activity';
+        if (cls === 'tourism' || type === 'museum' || type === 'attraction' || type === 'viewpoint') return 'sightseeing';
+        if (cls === 'shop') return 'shopping';
+        if (cls === 'leisure' || type === 'park' || type === 'garden' || type === 'beach') return 'activity';
         return 'general';
     }
 
