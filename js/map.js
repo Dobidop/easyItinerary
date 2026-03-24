@@ -538,7 +538,6 @@ const MapModule = (() => {
         panTo,
         invalidateSize,
         addSearchResultAsResource,
-        toggleRoute,
         setTileLayer,
         getMap,
     };

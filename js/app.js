@@ -2,11 +2,25 @@
 const App = (() => {
     let currentTrip = null;
 
-    function init() {
+    async function init() {
         // Apply saved theme before anything renders
         initTheme();
 
-        currentTrip = Storage.getActiveTrip();
+        // Check for shared trip in URL
+        const shareId = Storage.checkForSharedTrip();
+        if (shareId) {
+            try {
+                currentTrip = await Storage.loadSharedTrip(shareId);
+                showToast(`Imported shared trip: ${currentTrip.name}`);
+                // Clean URL
+                window.history.replaceState({}, '', '/');
+            } catch {
+                showToast('Shared trip not found');
+                currentTrip = Storage.getActiveTrip();
+            }
+        } else {
+            currentTrip = Storage.getActiveTrip();
+        }
 
         // Init all modules
         MapModule.init();
@@ -32,7 +46,7 @@ const App = (() => {
 
     // ===== Theme =====
     function initTheme() {
-        const saved = localStorage.getItem('easyitinerary-theme') || 'dark';
+        const saved = localStorage.getItem('easyitinerary-theme') || 'warm';
         applyTheme(saved);
     }
 
@@ -157,6 +171,17 @@ const App = (() => {
             Storage.setActiveTrip(e.target.value);
             currentTrip = Storage.getActiveTrip();
             reloadAll();
+        });
+
+        document.getElementById('btnShare').addEventListener('click', async () => {
+            try {
+                const result = await Storage.shareTrip(currentTrip);
+                const shareUrl = `${window.location.origin}${result.url}`;
+                await navigator.clipboard.writeText(shareUrl);
+                showToast('Share link copied to clipboard!');
+            } catch (err) {
+                showToast('Failed to share trip');
+            }
         });
 
         document.getElementById('btnExport').addEventListener('click', () => {

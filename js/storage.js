@@ -118,6 +118,35 @@ const Storage = (() => {
         });
     }
 
+    async function shareTrip(trip) {
+        const res = await fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(trip),
+        });
+        if (!res.ok) throw new Error('Share failed');
+        return res.json();
+    }
+
+    async function loadSharedTrip(shareId) {
+        const res = await fetch(`/api/share/${encodeURIComponent(shareId)}`);
+        if (!res.ok) throw new Error('Shared trip not found');
+        const data = await res.json();
+        const trip = data.trip;
+        // Assign new ID to avoid conflicts
+        trip.id = generateId();
+        const store = getAll();
+        store.trips.push(trip);
+        store.activeTripId = trip.id;
+        saveAll(store);
+        return trip;
+    }
+
+    function checkForSharedTrip() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('trip');
+    }
+
     return {
         getAll,
         getActiveTrip,
@@ -127,6 +156,9 @@ const Storage = (() => {
         createTrip,
         exportTrip,
         importTrip,
+        shareTrip,
+        loadSharedTrip,
+        checkForSharedTrip,
         generateId,
     };
 })();

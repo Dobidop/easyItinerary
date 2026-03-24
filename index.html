@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link rel="stylesheet" href="css/style.css" />
-    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('easyitinerary-theme') || 'dark');</script>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('easyitinerary-theme') || 'warm');</script>
 </head>
 <body>
     <!-- Top Bar -->
@@ -31,6 +31,7 @@
                     <button class="theme-option" data-theme="warm"><span class="theme-swatch warm"></span> Warm</button>
                 </div>
             </div>
+            <button class="btn btn-sm" id="btnShare" title="Share trip via link"><i class="fa-solid fa-share-nodes"></i> Share</button>
             <button class="btn btn-sm" id="btnExport" title="Export JSON"><i class="fa-solid fa-download"></i> Export</button>
             <button class="btn btn-sm" id="btnImport" title="Import JSON"><i class="fa-solid fa-upload"></i> Import</button>
             <input type="file" id="importFile" accept=".json" style="display:none" />

@@ -22,8 +22,8 @@
     --bcat-other: #94a3b8;
 }
 
-/* ===== Dark Theme (default) ===== */
-[data-theme="dark"], :root {
+/* ===== Dark Theme ===== */
+[data-theme="dark"] {
     --bg-primary: #1a1a2e;
     --bg-secondary: #16213e;
     --bg-card: #1e2a45;
@@ -94,8 +94,8 @@
     --popup-link: #88c0d0;
 }
 
-/* ===== Warm Theme ===== */
-[data-theme="warm"] {
+/* ===== Warm Theme (default) ===== */
+[data-theme="warm"], :root {
     --bg-primary: #faf6f1;
     --bg-secondary: #fff8f0;
     --bg-card: #ffffff;
