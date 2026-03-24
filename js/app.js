@@ -1,0 +1,446 @@
+/* ===== Main App Module ===== */
+const App = (() => {
+    let currentTrip = null;
+
+    function init() {
+        currentTrip = Storage.getActiveTrip();
+
+        // Init all modules
+        MapModule.init();
+        Itinerary.init(currentTrip);
+        Budget.init(currentTrip);
+        Resources.init(currentTrip);
+
+        // Populate UI
+        populateTripSelector();
+        loadTripData();
+        setupNavigation();
+        setupOverview();
+        setupTopBar();
+        setupModals();
+        updateStats();
+        MapModule.updateMarkers(currentTrip, 'all');
+
+        // Auto-save on input changes in overview
+        setupAutoSave();
+    }
+
+    // ===== Navigation =====
+    function setupNavigation() {
+        document.querySelectorAll('.section-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const section = tab.dataset.section;
+                switchSection(section);
+            });
+        });
+
+        // Summary card shortcuts
+        document.querySelectorAll('.summary-card[data-goto]').forEach(card => {
+            card.addEventListener('click', () => {
+                switchSection(card.dataset.goto);
+            });
+        });
+
+        // Map day filter
+        document.getElementById('mapDayFilter').addEventListener('change', (e) => {
+            MapModule.updateMarkers(currentTrip, e.target.value);
+        });
+
+        // Fit map button
+        document.getElementById('btnFitMap').addEventListener('click', () => {
+            MapModule.fitBounds();
+        });
+
+        // Toggle panel
+        document.getElementById('btnTogglePanel').addEventListener('click', () => {
+            const panel = document.querySelector('.left-panel');
+            panel.classList.toggle('collapsed');
+            setTimeout(() => MapModule.invalidateSize(), 300);
+        });
+    }
+
+    function switchSection(name) {
+        document.querySelectorAll('.section-tab').forEach(t => t.classList.toggle('active', t.dataset.section === name));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        const sectionMap = {
+            overview: 'sectionOverview',
+            itinerary: 'sectionItinerary',
+            budget: 'sectionBudget',
+            resources: 'sectionResources',
+        };
+        const el = document.getElementById(sectionMap[name]);
+        if (el) el.classList.add('active');
+    }
+
+    // ===== Top Bar =====
+    function setupTopBar() {
+        document.getElementById('btnNewTrip').addEventListener('click', () => {
+            const name = prompt('Trip name:', 'New Trip');
+            if (!name) return;
+            const trip = Storage.createTrip(name);
+            Storage.saveTrip(trip);
+            currentTrip = trip;
+            reloadAll();
+            showToast('New trip created');
+        });
+
+        document.getElementById('btnDeleteTrip').addEventListener('click', () => {
+            if (!confirm(`Delete "${currentTrip.name}"? This cannot be undone.`)) return;
+            Storage.deleteTrip(currentTrip.id);
+            currentTrip = Storage.getActiveTrip();
+            reloadAll();
+            showToast('Trip deleted');
+        });
+
+        document.getElementById('tripSelector').addEventListener('change', (e) => {
+            Storage.setActiveTrip(e.target.value);
+            currentTrip = Storage.getActiveTrip();
+            reloadAll();
+        });
+
+        document.getElementById('btnExport').addEventListener('click', () => {
+            Storage.exportTrip(currentTrip);
+            showToast('Trip exported');
+        });
+
+        document.getElementById('btnImport').addEventListener('click', () => {
+            document.getElementById('importFile').click();
+        });
+
+        document.getElementById('importFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const trip = await Storage.importTrip(file);
+                currentTrip = trip;
+                reloadAll();
+                showToast('Trip imported successfully');
+            } catch {
+                showToast('Failed to import trip');
+            }
+            e.target.value = '';
+        });
+    }
+
+    function populateTripSelector() {
+        const select = document.getElementById('tripSelector');
+        const data = Storage.getAll();
+        select.innerHTML = data.trips.map(t =>
+            `<option value="${t.id}" ${t.id === currentTrip.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`
+        ).join('');
+    }
+
+    // ===== Overview =====
+    function setupOverview() {
+        // Collapsible sections
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            header.addEventListener('click', () => {
+                header.parentElement.classList.toggle('collapsed');
+            });
+        });
+
+        // Reservations
+        document.getElementById('btnAddReservation').addEventListener('click', () => openReservationModal(null));
+        document.getElementById('btnSaveReservation').addEventListener('click', saveReservation);
+
+        // Checklist
+        document.getElementById('btnAddChecklist').addEventListener('click', addChecklistItem);
+        document.getElementById('checklistInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addChecklistItem();
+        });
+    }
+
+    function loadTripData() {
+        document.getElementById('tripName').value = currentTrip.name || '';
+        document.getElementById('tripStartDate').value = currentTrip.startDate || '';
+        document.getElementById('tripEndDate').value = currentTrip.endDate || '';
+        document.getElementById('tripNotes').value = currentTrip.notes || '';
+        updateTripDuration();
+        renderReservations();
+        renderChecklist();
+    }
+
+    function setupAutoSave() {
+        // Trip name
+        document.getElementById('tripName').addEventListener('input', (e) => {
+            currentTrip.name = e.target.value;
+            Storage.saveTrip(currentTrip);
+            populateTripSelector();
+        });
+
+        // Dates
+        document.getElementById('tripStartDate').addEventListener('change', (e) => {
+            currentTrip.startDate = e.target.value;
+            Storage.saveTrip(currentTrip);
+            updateTripDuration();
+            Itinerary.generateDaysFromDates();
+        });
+        document.getElementById('tripEndDate').addEventListener('change', (e) => {
+            currentTrip.endDate = e.target.value;
+            Storage.saveTrip(currentTrip);
+            updateTripDuration();
+            Itinerary.generateDaysFromDates();
+        });
+
+        // Notes
+        document.getElementById('tripNotes').addEventListener('input', (e) => {
+            currentTrip.notes = e.target.value;
+            Storage.saveTrip(currentTrip);
+        });
+    }
+
+    function updateTripDuration() {
+        const el = document.getElementById('tripDuration');
+        if (currentTrip.startDate && currentTrip.endDate) {
+            const start = new Date(currentTrip.startDate);
+            const end = new Date(currentTrip.endDate);
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            if (days > 0) {
+                el.textContent = `(${days} day${days !== 1 ? 's' : ''})`;
+            } else {
+                el.textContent = '';
+            }
+        } else {
+            el.textContent = '';
+        }
+    }
+
+    // ===== Reservations =====
+    let editingReservationIdx = null;
+
+    function openReservationModal(idx) {
+        editingReservationIdx = idx;
+        const modal = document.getElementById('reservationModal');
+
+        if (idx !== null && idx !== undefined) {
+            const res = currentTrip.reservations[idx];
+            document.getElementById('reservationType').value = res.type || 'other';
+            document.getElementById('reservationTitle').value = res.title || '';
+            document.getElementById('reservationProvider').value = res.provider || '';
+            document.getElementById('reservationConfirmation').value = res.confirmation || '';
+            document.getElementById('reservationDate').value = res.date || '';
+            document.getElementById('reservationTime').value = res.time || '';
+            document.getElementById('reservationCost').value = res.cost || '';
+            document.getElementById('reservationNotes').value = res.notes || '';
+            document.getElementById('reservationLink').value = res.link || '';
+        } else {
+            document.getElementById('reservationType').value = 'flight';
+            document.getElementById('reservationTitle').value = '';
+            document.getElementById('reservationProvider').value = '';
+            document.getElementById('reservationConfirmation').value = '';
+            document.getElementById('reservationDate').value = '';
+            document.getElementById('reservationTime').value = '';
+            document.getElementById('reservationCost').value = '';
+            document.getElementById('reservationNotes').value = '';
+            document.getElementById('reservationLink').value = '';
+        }
+        modal.classList.add('open');
+    }
+
+    function saveReservation() {
+        const title = document.getElementById('reservationTitle').value.trim();
+        if (!title) {
+            document.getElementById('reservationTitle').focus();
+            return;
+        }
+
+        const reservation = {
+            id: editingReservationIdx !== null ? currentTrip.reservations[editingReservationIdx].id : Storage.generateId(),
+            type: document.getElementById('reservationType').value,
+            title,
+            provider: document.getElementById('reservationProvider').value,
+            confirmation: document.getElementById('reservationConfirmation').value,
+            date: document.getElementById('reservationDate').value,
+            time: document.getElementById('reservationTime').value,
+            cost: parseFloat(document.getElementById('reservationCost').value) || 0,
+            notes: document.getElementById('reservationNotes').value,
+            link: document.getElementById('reservationLink').value,
+        };
+
+        if (editingReservationIdx !== null) {
+            currentTrip.reservations[editingReservationIdx] = reservation;
+        } else {
+            currentTrip.reservations.push(reservation);
+        }
+
+        Storage.saveTrip(currentTrip);
+        document.getElementById('reservationModal').classList.remove('open');
+        editingReservationIdx = null;
+        renderReservations();
+    }
+
+    function deleteReservation(idx) {
+        if (!confirm('Delete this reservation?')) return;
+        currentTrip.reservations.splice(idx, 1);
+        Storage.saveTrip(currentTrip);
+        renderReservations();
+    }
+
+    function renderReservations() {
+        const container = document.getElementById('reservationsList');
+        if (!currentTrip.reservations || currentTrip.reservations.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No reservations added yet.</p></div>';
+            return;
+        }
+
+        const typeIcons = {
+            flight: { icon: 'fa-plane', class: 'flight' },
+            hotel: { icon: 'fa-bed', class: 'hotel' },
+            rental: { icon: 'fa-car', class: 'rental' },
+            train: { icon: 'fa-train', class: 'train' },
+            bus: { icon: 'fa-bus', class: 'bus' },
+            other: { icon: 'fa-ellipsis', class: 'other' },
+        };
+
+        container.innerHTML = currentTrip.reservations.map((res, idx) => {
+            const t = typeIcons[res.type] || typeIcons.other;
+            const sym = Budget.getCurrencySymbol(currentTrip.budgetCurrency);
+            return `
+                <div class="reservation-card">
+                    <div class="reservation-icon ${t.class}"><i class="fa-solid ${t.icon}"></i></div>
+                    <div class="reservation-info">
+                        <h4>${escapeHtml(res.title)}</h4>
+                        <div class="reservation-meta">
+                            ${res.provider ? `<span>${escapeHtml(res.provider)}</span>` : ''}
+                            ${res.date ? `<span><i class="fa-regular fa-calendar"></i> ${res.date}</span>` : ''}
+                            ${res.time ? `<span><i class="fa-regular fa-clock"></i> ${res.time}</span>` : ''}
+                            ${res.cost ? `<span>${sym}${res.cost}</span>` : ''}
+                        </div>
+                        ${res.confirmation ? `<span class="reservation-confirmation" onclick="navigator.clipboard.writeText('${escapeHtml(res.confirmation)}'); showToast('Copied')" title="Click to copy">${escapeHtml(res.confirmation)}</span>` : ''}
+                    </div>
+                    <div class="reservation-actions">
+                        ${res.link ? `<button onclick="window.open('${escapeHtml(res.link)}', '_blank')" title="Open link"><i class="fa-solid fa-external-link"></i></button>` : ''}
+                        <button onclick="App.openReservationModal(${idx})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="App.deleteReservation(${idx})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ===== Checklist =====
+    function addChecklistItem() {
+        const input = document.getElementById('checklistInput');
+        const text = input.value.trim();
+        if (!text) return;
+
+        currentTrip.checklist.push({ text, checked: false });
+        Storage.saveTrip(currentTrip);
+        input.value = '';
+        renderChecklist();
+    }
+
+    function toggleChecklistItem(idx) {
+        currentTrip.checklist[idx].checked = !currentTrip.checklist[idx].checked;
+        Storage.saveTrip(currentTrip);
+        renderChecklist();
+    }
+
+    function deleteChecklistItem(idx) {
+        currentTrip.checklist.splice(idx, 1);
+        Storage.saveTrip(currentTrip);
+        renderChecklist();
+    }
+
+    function renderChecklist() {
+        const container = document.getElementById('checklistItems');
+        if (!currentTrip.checklist || currentTrip.checklist.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = currentTrip.checklist.map((item, idx) => `
+            <div class="checklist-item ${item.checked ? 'checked' : ''}">
+                <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="App.toggleChecklistItem(${idx})" />
+                <span>${escapeHtml(item.text)}</span>
+                <button onclick="App.deleteChecklistItem(${idx})" title="Remove"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        `).join('');
+    }
+
+    // ===== Stats =====
+    function updateStats() {
+        const totalDays = currentTrip.days.length;
+        const totalActivities = currentTrip.days.reduce((sum, d) => sum + d.activities.length, 0);
+        const sym = Budget.getCurrencySymbol(currentTrip.budgetCurrency);
+        const spent = Budget.getTotalSpent();
+        const totalLinks = (currentTrip.resources || []).length;
+
+        document.getElementById('statDays').textContent = totalDays;
+        document.getElementById('statActivities').textContent = totalActivities;
+        document.getElementById('statBudget').textContent = `${sym}${spent.toFixed(spent % 1 === 0 ? 0 : 2)}`;
+        document.getElementById('statLinks').textContent = totalLinks;
+    }
+
+    // ===== Modals =====
+    function setupModals() {
+        // Close buttons
+        document.querySelectorAll('[data-close]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = document.getElementById(btn.dataset.close);
+                if (modal) modal.classList.remove('open');
+            });
+        });
+
+        // Click outside to close
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('open');
+            });
+        });
+
+        // Escape key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+            }
+        });
+    }
+
+    // ===== Reload =====
+    function reloadAll() {
+        populateTripSelector();
+        loadTripData();
+        Itinerary.update(currentTrip);
+        Budget.update(currentTrip);
+        Resources.update(currentTrip);
+        updateStats();
+        MapModule.updateMarkers(currentTrip, 'all');
+    }
+
+    // ===== Helpers =====
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    return {
+        init,
+        updateStats,
+        switchSection,
+        openReservationModal,
+        deleteReservation,
+        toggleChecklistItem,
+        deleteChecklistItem,
+    };
+})();
+
+// ===== Toast =====
+function showToast(message) {
+    let toast = document.querySelector('.toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ===== Init on DOM ready =====
+document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+});

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyItinerary - Trip Planner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <h1 class="logo"><i class="fa-solid fa-route"></i> EasyItinerary</h1>
+            <span class="save-status" id="saveStatus">Saved</span>
+        </div>
+        <div class="top-bar-center">
+            <select id="tripSelector" class="trip-selector"></select>
+            <button class="btn btn-sm" id="btnNewTrip" title="New Trip"><i class="fa-solid fa-plus"></i> New Trip</button>
+            <button class="btn btn-sm btn-danger" id="btnDeleteTrip" title="Delete Trip"><i class="fa-solid fa-trash"></i></button>
+        </div>
+        <div class="top-bar-right">
+            <button class="btn btn-sm" id="btnExport" title="Export JSON"><i class="fa-solid fa-download"></i> Export</button>
+            <button class="btn btn-sm" id="btnImport" title="Import JSON"><i class="fa-solid fa-upload"></i> Import</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" />
+        </div>
+    </header>
+
+    <!-- Main Layout: Left Panel + Right Map -->
+    <div class="main-layout">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Section Navigation -->
+            <nav class="section-nav">
+                <button class="section-tab active" data-section="overview"><i class="fa-solid fa-house"></i> Overview</button>
+                <button class="section-tab" data-section="itinerary"><i class="fa-solid fa-calendar-days"></i> Itinerary</button>
+                <button class="section-tab" data-section="budget"><i class="fa-solid fa-wallet"></i> Budget</button>
+                <button class="section-tab" data-section="resources"><i class="fa-solid fa-bookmark"></i> Resources</button>
+            </nav>
+
+            <!-- Scrollable Content -->
+            <div class="panel-content">
+
+                <!-- OVERVIEW SECTION -->
+                <section id="sectionOverview" class="section active">
+                    <!-- Trip Header / Cover -->
+                    <div class="trip-header">
+                        <div class="trip-header-content">
+                            <input type="text" id="tripName" class="trip-name-input" placeholder="Trip Name" />
+                            <div class="trip-dates-row">
+                                <i class="fa-regular fa-calendar"></i>
+                                <input type="date" id="tripStartDate" />
+                                <span>—</span>
+                                <input type="date" id="tripEndDate" />
+                                <span class="trip-duration" id="tripDuration"></span>
+                            </div>
+                            <textarea id="tripNotes" class="trip-notes" placeholder="Add trip notes, travel companions, important info..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="summary-cards">
+                        <div class="summary-card" data-goto="itinerary">
+                            <div class="summary-card-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                            <div class="summary-card-info">
+                                <span class="summary-card-value" id="statDays">0</span>
+                                <span class="summary-card-label">Days Planned</span>
+                            </div>
+                        </div>
+                        <div class="summary-card" data-goto="itinerary">
+                            <div class="summary-card-icon"><i class="fa-solid fa-location-dot"></i></div>
+                            <div class="summary-card-info">
+                                <span class="summary-card-value" id="statActivities">0</span>
+                                <span class="summary-card-label">Activities</span>
+                            </div>
+                        </div>
+                        <div class="summary-card" data-goto="budget">
+                            <div class="summary-card-icon"><i class="fa-solid fa-wallet"></i></div>
+                            <div class="summary-card-info">
+                                <span class="summary-card-value" id="statBudget">$0</span>
+                                <span class="summary-card-label">Budget Spent</span>
+                            </div>
+                        </div>
+                        <div class="summary-card" data-goto="resources">
+                            <div class="summary-card-icon"><i class="fa-solid fa-bookmark"></i></div>
+                            <div class="summary-card-info">
+                                <span class="summary-card-value" id="statLinks">0</span>
+                                <span class="summary-card-label">Saved Links</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reservations / Transport -->
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" data-target="reservations">
+                            <i class="fa-solid fa-chevron-down"></i>
+                            <h3>Reservations & Transport</h3>
+                        </div>
+                        <div class="collapsible-body" id="reservations">
+                            <div id="reservationsList" class="reservations-list"></div>
+                            <button class="btn btn-add" id="btnAddReservation"><i class="fa-solid fa-plus"></i> Add Reservation</button>
+                        </div>
+                    </div>
+
+                    <!-- Packing / Checklist -->
+                    <div class="collapsible-section">
+                        <div class="collapsible-header" data-target="checklist">
+                            <i class="fa-solid fa-chevron-down"></i>
+                            <h3>Checklist</h3>
+                        </div>
+                        <div class="collapsible-body" id="checklist">
+                            <div id="checklistItems" class="checklist-items"></div>
+                            <div class="checklist-add-row">
+                                <input type="text" id="checklistInput" placeholder="Add item..." />
+                                <button class="btn btn-sm" id="btnAddChecklist"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ITINERARY SECTION -->
+                <section id="sectionItinerary" class="section">
+                    <div class="section-header">
+                        <h2>Day-by-Day Itinerary</h2>
+                        <button class="btn btn-sm" id="btnAddDay"><i class="fa-solid fa-plus"></i> Add Day</button>
+                    </div>
+                    <div id="itineraryDays" class="itinerary-days"></div>
+                </section>
+
+                <!-- BUDGET SECTION -->
+                <section id="sectionBudget" class="section">
+                    <div class="section-header">
+                        <h2>Budget</h2>
+                    </div>
+                    <div class="budget-overview">
+                        <div class="budget-total-row">
+                            <div class="budget-set">
+                                <label>Total Budget</label>
+                                <div class="input-with-currency">
+                                    <select id="budgetCurrency" class="currency-select">
+                                        <option value="USD">$ USD</option>
+                                        <option value="EUR">€ EUR</option>
+                                        <option value="GBP">£ GBP</option>
+                                        <option value="JPY">¥ JPY</option>
+                                        <option value="SEK">kr SEK</option>
+                                        <option value="NOK">kr NOK</option>
+                                        <option value="DKK">kr DKK</option>
+                                        <option value="CHF">Fr CHF</option>
+                                        <option value="CAD">$ CAD</option>
+                                        <option value="AUD">$ AUD</option>
+                                        <option value="THB">฿ THB</option>
+                                    </select>
+                                    <input type="number" id="budgetTotal" placeholder="0" min="0" step="1" />
+                                </div>
+                            </div>
+                            <div class="budget-remaining">
+                                <span class="budget-remaining-label">Remaining</span>
+                                <span class="budget-remaining-value" id="budgetRemaining">$0</span>
+                            </div>
+                        </div>
+                        <div class="budget-bar-container">
+                            <div class="budget-bar" id="budgetBar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Category breakdown chart -->
+                    <div class="budget-chart" id="budgetChart"></div>
+
+                    <!-- Expenses list -->
+                    <div class="expenses-header">
+                        <h3>Expenses</h3>
+                        <button class="btn btn-sm btn-add" id="btnAddExpense"><i class="fa-solid fa-plus"></i> Add Expense</button>
+                    </div>
+                    <div id="expensesList" class="expenses-list"></div>
+                </section>
+
+                <!-- RESOURCES SECTION -->
+                <section id="sectionResources" class="section">
+                    <div class="section-header">
+                        <h2>Links & Resources</h2>
+                        <button class="btn btn-sm btn-add" id="btnAddResource"><i class="fa-solid fa-plus"></i> Add Link</button>
+                    </div>
+                    <div class="resource-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="restaurant"><i class="fa-solid fa-utensils"></i> Restaurants</button>
+                        <button class="filter-btn" data-filter="hotel"><i class="fa-solid fa-bed"></i> Hotels</button>
+                        <button class="filter-btn" data-filter="transport"><i class="fa-solid fa-plane"></i> Transport</button>
+                        <button class="filter-btn" data-filter="activity"><i class="fa-solid fa-camera"></i> Activities</button>
+                        <button class="filter-btn" data-filter="general"><i class="fa-solid fa-link"></i> General</button>
+                    </div>
+                    <div id="resourcesList" class="resources-list"></div>
+                </section>
+
+            </div><!-- /panel-content -->
+        </div><!-- /left-panel -->
+
+        <!-- Right Map Panel -->
+        <div class="right-panel">
+            <div class="map-controls">
+                <select id="mapDayFilter" class="map-filter">
+                    <option value="all">All Days</option>
+                </select>
+                <button class="btn btn-sm" id="btnFitMap" title="Fit all markers"><i class="fa-solid fa-expand"></i></button>
+                <button class="btn btn-sm" id="btnTogglePanel" title="Toggle panel"><i class="fa-solid fa-angles-left"></i></button>
+            </div>
+            <div id="map" class="map-container"></div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <!-- Activity Modal -->
+    <div class="modal-overlay" id="activityModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="activityModalTitle">Add Activity</h3>
+                <button class="modal-close" data-close="activityModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Title</label>
+                        <input type="text" id="activityTitle" placeholder="Activity name" />
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="activityCategory">
+                            <option value="sightseeing">Sightseeing</option>
+                            <option value="food">Food & Drink</option>
+                            <option value="transport">Transport</option>
+                            <option value="lodging">Lodging</option>
+                            <option value="activity">Activity</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="activityStartTime" />
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="activityEndTime" />
+                    </div>
+                    <div class="form-group">
+                        <label>Cost</label>
+                        <input type="number" id="activityCost" placeholder="0" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="activityDescription" placeholder="Details, notes, booking info..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Link (URL)</label>
+                    <input type="url" id="activityLink" placeholder="https://..." />
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Address / Location</label>
+                        <input type="text" id="activityAddress" placeholder="Address or location name" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Latitude</label>
+                        <input type="number" id="activityLat" placeholder="e.g. 48.8566" step="any" />
+                    </div>
+                    <div class="form-group">
+                        <label>Longitude</label>
+                        <input type="number" id="activityLng" placeholder="e.g. 2.3522" step="any" />
+                    </div>
+                    <div class="form-group form-group-btn">
+                        <button class="btn btn-sm" id="btnPickLocation" title="Pick on map"><i class="fa-solid fa-map-pin"></i> Pick on Map</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-close="activityModal">Cancel</button>
+                <button class="btn btn-primary" id="btnSaveActivity">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expense Modal -->
+    <div class="modal-overlay" id="expenseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Expense</h3>
+                <button class="modal-close" data-close="expenseModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Description</label>
+                        <input type="text" id="expenseDescription" placeholder="What did you spend on?" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="expenseAmount" placeholder="0" min="0" step="0.01" />
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select id="expenseCurrency">
+                            <option value="USD">$ USD</option>
+                            <option value="EUR">€ EUR</option>
+                            <option value="GBP">£ GBP</option>
+                            <option value="JPY">¥ JPY</option>
+                            <option value="SEK">kr SEK</option>
+                            <option value="NOK">kr NOK</option>
+                            <option value="DKK">kr DKK</option>
+                            <option value="CHF">Fr CHF</option>
+                            <option value="CAD">$ CAD</option>
+                            <option value="AUD">$ AUD</option>
+                            <option value="THB">฿ THB</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="expenseCategory">
+                            <option value="transport">Transport</option>
+                            <option value="accommodation">Accommodation</option>
+                            <option value="food">Food & Drink</option>
+                            <option value="activities">Activities</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="expenseDate" />
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Notes</label>
+                        <input type="text" id="expenseNotes" placeholder="Optional notes" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-close="expenseModal">Cancel</button>
+                <button class="btn btn-primary" id="btnSaveExpense">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Modal -->
+    <div class="modal-overlay" id="resourceModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Link / Resource</h3>
+                <button class="modal-close" data-close="resourceModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="resourceTitle" placeholder="Link title" />
+                </div>
+                <div class="form-group">
+                    <label>URL</label>
+                    <input type="url" id="resourceUrl" placeholder="https://..." />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="resourceCategory">
+                            <option value="restaurant">Restaurant</option>
+                            <option value="hotel">Hotel</option>
+                            <option value="transport">Transport</option>
+                            <option value="activity">Activity</option>
+                            <option value="general">General</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="resourceNotes" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Latitude (optional)</label>
+                        <input type="number" id="resourceLat" placeholder="e.g. 48.8566" step="any" />
+                    </div>
+                    <div class="form-group">
+                        <label>Longitude (optional)</label>
+                        <input type="number" id="resourceLng" placeholder="e.g. 2.3522" step="any" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-close="resourceModal">Cancel</button>
+                <button class="btn btn-primary" id="btnSaveResource">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reservation Modal -->
+    <div class="modal-overlay" id="reservationModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Reservation</h3>
+                <button class="modal-close" data-close="reservationModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="reservationType">
+                            <option value="flight">Flight</option>
+                            <option value="hotel">Hotel / Lodging</option>
+                            <option value="rental">Rental Car</option>
+                            <option value="train">Train</option>
+                            <option value="bus">Bus</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Title</label>
+                        <input type="text" id="reservationTitle" placeholder="e.g. SFO → LIH" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Provider / Company</label>
+                        <input type="text" id="reservationProvider" placeholder="e.g. United Airlines" />
+                    </div>
+                    <div class="form-group">
+                        <label>Confirmation #</label>
+                        <input type="text" id="reservationConfirmation" placeholder="e.g. KPS643" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="reservationDate" />
+                    </div>
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="time" id="reservationTime" />
+                    </div>
+                    <div class="form-group">
+                        <label>Cost</label>
+                        <input type="number" id="reservationCost" placeholder="0" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="reservationNotes" placeholder="Details, terminal info, check-in links..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Link (URL)</label>
+                    <input type="url" id="reservationLink" placeholder="https://..." />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-close="reservationModal">Cancel</button>
+                <button class="btn btn-primary" id="btnSaveReservation">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/itinerary.js"></script>
+    <script src="js/budget.js"></script>
+    <script src="js/resources.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
