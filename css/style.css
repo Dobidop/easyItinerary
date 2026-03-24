@@ -870,9 +870,11 @@ body {
     position: absolute;
     top: 10px;
     left: 10px;
+    right: 10px;
     z-index: 1000;
     display: flex;
     gap: 6px;
+    align-items: flex-start;
 }
 .map-filter {
     background: var(--bg-card);
@@ -882,6 +884,134 @@ body {
     padding: 5px 10px;
     font-size: 12px;
     box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* Map Search */
+.map-search-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+}
+.map-search-input-row {
+    display: flex;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px var(--shadow);
+    overflow: hidden;
+}
+.map-search-icon {
+    padding: 0 8px 0 10px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.map-search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    padding: 7px 4px;
+    outline: none;
+    min-width: 0;
+}
+.map-search-input::placeholder { color: var(--text-muted); }
+.map-search-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.map-search-clear:hover { color: var(--text-primary); }
+
+.map-search-results {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px var(--shadow);
+    max-height: 350px;
+    overflow-y: auto;
+}
+.map-search-results.open { display: block; }
+
+.search-loading, .search-no-results {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.search-loading i { margin-right: 6px; }
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--bg-hover); }
+
+.search-result-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-light);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.search-result-info { flex: 1; min-width: 0; }
+.search-result-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result-address { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result-type {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
+    display: inline-block;
+    margin-top: 2px;
+}
+
+.search-result-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.search-result-actions .btn { padding: 4px 8px; font-size: 11px; }
+
+.search-marker {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--warning);
+    border: 2px solid #fff;
+    color: #000;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
 .map-container {
@@ -1041,6 +1171,26 @@ body {
     padding-bottom: 12px;
 }
 
+.input-with-action {
+    display: flex;
+    gap: 6px;
+}
+.input-with-action input { flex: 1; }
+.input-with-action .btn { white-space: nowrap; flex-shrink: 0; }
+
+.form-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: none;
+    align-items: center;
+    gap: 4px;
+}
+.form-hint.visible { display: flex; }
+.form-hint i { font-size: 10px; color: var(--warning); }
+.form-hint .fa-check { color: var(--success); }
+.form-hint .fa-spinner { color: var(--accent); }
+
 /* ===== Empty States ===== */
 .empty-state {
     text-align: center;
@@ -1088,7 +1238,8 @@ body {
     .right-panel { height: 40vh; }
     .top-bar-center { display: none; }
     .summary-cards { grid-template-columns: repeat(2, 1fr); }
-    .map-controls { top: 5px; left: 5px; }
+    .map-controls { top: 5px; left: 5px; right: 5px; }
+    .map-search-wrapper { max-width: 220px; }
 }
 
 /* ===== Utility ===== */

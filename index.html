@@ -198,6 +198,14 @@
         <!-- Right Map Panel -->
         <div class="right-panel">
             <div class="map-controls">
+                <div class="map-search-wrapper">
+                    <div class="map-search-input-row">
+                        <i class="fa-solid fa-magnifying-glass map-search-icon"></i>
+                        <input type="text" id="mapSearchInput" class="map-search-input" placeholder="Search places..." autocomplete="off" />
+                        <button class="map-search-clear" id="mapSearchClear" title="Clear"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="map-search-results" id="mapSearchResults"></div>
+                </div>
                 <select id="mapDayFilter" class="map-filter">
                     <option value="all">All Days</option>
                 </select>
@@ -363,7 +371,11 @@
                 </div>
                 <div class="form-group">
                     <label>URL</label>
-                    <input type="url" id="resourceUrl" placeholder="https://..." />
+                    <div class="input-with-action">
+                        <input type="url" id="resourceUrl" placeholder="Paste a Google Maps or other URL..." />
+                        <button class="btn btn-sm" id="btnFetchFromUrl" title="Extract location data from URL"><i class="fa-solid fa-wand-magic-sparkles"></i> Fetch</button>
+                    </div>
+                    <div class="form-hint" id="resourceUrlHint"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -389,6 +401,9 @@
                     <div class="form-group">
                         <label>Longitude (optional)</label>
                         <input type="number" id="resourceLng" placeholder="e.g. 2.3522" step="any" />
+                    </div>
+                    <div class="form-group form-group-btn">
+                        <button class="btn btn-sm" id="btnPickResourceLocation" title="Pick on map"><i class="fa-solid fa-map-pin"></i> Pick on Map</button>
                     </div>
                 </div>
             </div>
