@@ -625,8 +625,52 @@ body {
 
 .day-body { padding: 0 16px 12px; }
 
+/* Timeline Bar (visual overview) */
+.timeline-bar {
+    margin-bottom: 10px;
+    padding: 0 2px;
+}
+.tbar-track {
+    position: relative;
+    height: 22px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+.tbar-hour {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--border);
+    font-size: 9px;
+    color: var(--text-muted);
+    padding-left: 3px;
+    line-height: 22px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.tbar-block {
+    position: absolute;
+    top: 3px;
+    height: 16px;
+    border-radius: 3px;
+    opacity: 0.85;
+    cursor: default;
+    min-width: 4px;
+    transition: opacity 0.15s;
+}
+.tbar-block:hover { opacity: 1; }
+.tbar-block.sightseeing { background: var(--cat-sightseeing); }
+.tbar-block.food { background: var(--cat-food); }
+.tbar-block.transport { background: var(--cat-transport); }
+.tbar-block.lodging { background: var(--cat-lodging); }
+.tbar-block.activity { background: var(--cat-activity); }
+.tbar-block.shopping { background: var(--cat-shopping); }
+.tbar-block.other { background: var(--cat-other); }
+
 /* Activity Timeline */
-.activity-timeline { position: relative; }
+.activity-timeline { position: relative; margin-left: 44px; }
 .activity-timeline::before {
     content: '';
     position: absolute;
@@ -668,6 +712,16 @@ body {
     z-index: 1;
 }
 
+.activity-time-label {
+    position: absolute;
+    left: -74px;
+    top: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: 38px;
+    text-align: right;
+}
 .activity-marker.sightseeing { border-color: var(--cat-sightseeing); color: var(--cat-sightseeing); }
 .activity-marker.food { border-color: var(--cat-food); color: var(--cat-food); }
 .activity-marker.transport { border-color: var(--cat-transport); color: var(--cat-transport); }
@@ -762,8 +816,8 @@ body {
     width: 100%;
     padding: 8px;
     margin-top: 4px;
-    margin-left: 36px;
-    width: calc(100% - 36px);
+    margin-left: 80px;
+    width: calc(100% - 80px);
     background: none;
     border: 1px dashed var(--border);
     border-radius: var(--radius-sm);

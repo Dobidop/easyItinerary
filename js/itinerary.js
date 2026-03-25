@@ -194,6 +194,54 @@ const Itinerary = (() => {
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
     }
 
+    function buildTimelineBar(activities) {
+        const timed = activities.filter(a => a.startTime);
+        if (timed.length === 0) return '';
+
+        // Find day range from earliest start to latest end
+        const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+        let earliest = 24 * 60, latest = 0;
+        timed.forEach(a => {
+            const s = toMin(a.startTime);
+            const e = a.endTime ? toMin(a.endTime) : s + 30;
+            if (s < earliest) earliest = s;
+            if (e > latest) latest = e;
+        });
+
+        // Snap to hour boundaries with padding
+        earliest = Math.floor(earliest / 60) * 60;
+        latest = Math.ceil(latest / 60) * 60;
+        if (latest <= earliest) latest = earliest + 60;
+        const span = latest - earliest;
+
+        // Hour labels
+        const hours = [];
+        for (let m = earliest; m <= latest; m += 60) {
+            const pct = ((m - earliest) / span) * 100;
+            const h = Math.floor(m / 60);
+            hours.push(`<span class="tbar-hour" style="left:${pct}%">${h}:00</span>`);
+        }
+
+        // Activity blocks
+        const blocks = timed.map(a => {
+            const s = toMin(a.startTime);
+            const e = a.endTime ? toMin(a.endTime) : s + 30;
+            const left = ((s - earliest) / span) * 100;
+            const width = Math.max(((e - s) / span) * 100, 1.5);
+            const cat = a.category || 'other';
+            return `<div class="tbar-block ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(a.title)}  ${a.startTime}${a.endTime ? '–' + a.endTime : ''}"></div>`;
+        }).join('');
+
+        return `
+            <div class="timeline-bar">
+                <div class="tbar-track">
+                    ${hours.join('')}
+                    ${blocks}
+                </div>
+            </div>
+        `;
+    }
+
     function sortActivitiesByTime(activities) {
         activities.sort((a, b) => {
             // Activities with start time come first, sorted by time
@@ -292,6 +340,7 @@ const Itinerary = (() => {
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
                 return `
                     <div class="activity-card" draggable="true" data-day="${dayIdx}" data-act="${actIdx}">
+                        ${act.startTime ? `<span class="activity-time-label">${act.startTime}</span>` : ''}
                         <div class="activity-marker ${act.category}"><i class="fa-solid ${getCategoryIcon(act.category)}"></i></div>
                         <div class="activity-top-row">
                             <span class="activity-title">${escapeHtml(act.title)}</span>
@@ -333,6 +382,7 @@ const Itinerary = (() => {
                     </div>
                     <div class="day-body">
                         ${lodgingHtml}
+                        ${buildTimelineBar(day.activities)}
                         <div class="activity-timeline" data-day="${dayIdx}">
                             ${activitiesHtml}
                         </div>
