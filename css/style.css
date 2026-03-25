@@ -632,7 +632,7 @@ body {
 }
 .tbar-track {
     position: relative;
-    height: 22px;
+    height: 34px;
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -641,19 +641,19 @@ body {
 .tbar-hour {
     position: absolute;
     top: 0;
-    bottom: 0;
+    height: 14px;
     border-left: 1px solid var(--border);
     font-size: 9px;
     color: var(--text-muted);
     padding-left: 3px;
-    line-height: 22px;
+    line-height: 14px;
     pointer-events: none;
     white-space: nowrap;
 }
 .tbar-block {
     position: absolute;
-    top: 3px;
-    height: 16px;
+    top: 16px;
+    height: 14px;
     border-radius: 3px;
     opacity: 0.85;
     cursor: default;
@@ -1295,6 +1295,10 @@ body {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+}
+
+.route-line-animated {
+    stroke-linecap: round;
 }
 
 .map-container {

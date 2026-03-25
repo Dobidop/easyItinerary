@@ -449,6 +449,8 @@ const MapModule = (() => {
     }
 
     /* ===== Route line ===== */
+    let routeAnimation = null;
+
     function drawRouteLine(trip, dayFilter) {
         removeRouteLine();
         if (!trip) return;
@@ -456,7 +458,6 @@ const MapModule = (() => {
         const points = [];
         trip.days.forEach((day, dayIdx) => {
             if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
-            // Activities are already sorted by time within each day
             day.activities.forEach(act => {
                 if (act.lat && act.lng) {
                     points.push([act.lat, act.lng]);
@@ -466,22 +467,47 @@ const MapModule = (() => {
 
         if (points.length < 2) return;
 
+        const theme = document.documentElement.getAttribute('data-theme') || 'warm';
+        const colors = { dark: '#4f8cff', light: '#3b6de0', nord: '#88c0d0', warm: '#d97b3d' };
+        const color = colors[theme] || '#4f8cff';
+
+        // Base line (faint static trail)
         routeLine = L.polyline(points, {
-            color: 'var(--accent)',
-            weight: 2.5,
-            opacity: 0.7,
-            dashArray: '8, 8',
-            className: 'route-line',
+            color: color,
+            weight: 3,
+            opacity: 0.25,
         }).addTo(map);
 
-        // Use a fixed color since CSS vars don't work in SVG
-        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        const colors = { dark: '#4f8cff', light: '#3b6de0', nord: '#88c0d0', warm: '#d97b3d' };
-        routeLine.setStyle({ color: colors[theme] || '#4f8cff' });
+        // Animated overlay with marching dashes
+        const animatedLine = L.polyline(points, {
+            color: color,
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '12, 16',
+            dashOffset: '0',
+            className: 'route-line-animated',
+        }).addTo(map);
+
+        // Store reference for cleanup
+        routeLine._animatedOverlay = animatedLine;
+
+        // Animate dash offset
+        let offset = 0;
+        routeAnimation = setInterval(() => {
+            offset -= 1;
+            animatedLine.getElement()?.setAttribute('stroke-dashoffset', offset);
+        }, 40);
     }
 
     function removeRouteLine() {
+        if (routeAnimation) {
+            clearInterval(routeAnimation);
+            routeAnimation = null;
+        }
         if (routeLine) {
+            if (routeLine._animatedOverlay) {
+                map.removeLayer(routeLine._animatedOverlay);
+            }
             map.removeLayer(routeLine);
             routeLine = null;
         }
@@ -541,5 +567,6 @@ const MapModule = (() => {
         addSearchResultAsResource,
         setTileLayer,
         getMap,
+        toggleRoute,
     };
 })();
