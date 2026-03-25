@@ -266,7 +266,8 @@ const Resources = (() => {
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-bookmark"></i>
-                    <p>${activeFilter === 'all' ? 'No links saved yet. Click "Add Link" to save restaurants, hotels, and more.' : 'No links in this category.'}</p>
+                    <p>${activeFilter === 'all' ? 'No links saved yet. Save restaurants, hotels, and more.' : 'No links in this category.'}</p>
+                    ${activeFilter === 'all' ? '<button class="btn btn-small" onclick="Resources.openModal(null)"><i class="fa-solid fa-plus"></i> Add Link</button>' : ''}
                 </div>
             `;
             return;

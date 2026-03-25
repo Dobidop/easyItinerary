@@ -514,7 +514,11 @@ const App = (() => {
     function renderReservations() {
         const container = document.getElementById('reservationsList');
         if (!currentTrip.reservations || currentTrip.reservations.length === 0) {
-            container.innerHTML = '<div class="empty-state"><p>No reservations added yet.</p></div>';
+            container.innerHTML = `<div class="empty-state">
+                <i class="fa-solid fa-suitcase-rolling"></i>
+                <p>No reservations added yet.</p>
+                <button class="btn btn-small" onclick="App.openReservationModal(null)"><i class="fa-solid fa-plus"></i> Add Reservation</button>
+            </div>`;
             return;
         }
 

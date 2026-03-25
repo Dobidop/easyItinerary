@@ -490,15 +490,24 @@ body {
 .reservation-meta span { display: flex; align-items: center; gap: 4px; }
 .reservation-confirmation {
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px dashed var(--border);
     border-radius: var(--radius-sm);
     padding: 4px 8px;
     font-size: 11px;
     font-family: monospace;
     color: var(--text-secondary);
     cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
-.reservation-confirmation:hover { color: var(--accent); }
+.reservation-confirmation:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+.reservation-confirmation i { font-size: 10px; opacity: 0.6; }
+.reservation-confirmation:hover i { opacity: 1; }
 
 .reservation-actions {
     display: flex;
@@ -1402,7 +1411,16 @@ body {
     display: block;
     opacity: 0.5;
 }
-.empty-state p { font-size: 13px; }
+.empty-state p { font-size: 13px; margin-bottom: 12px; }
+.empty-state .btn { margin-top: 4px; }
+
+/* Small button variant */
+.btn-small {
+    padding: 6px 14px;
+    font-size: 12px;
+    gap: 5px;
+}
+.btn-small i { font-size: 10px; }
 
 /* ===== Toast Notification ===== */
 .toast {

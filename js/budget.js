@@ -219,7 +219,8 @@ const Budget = (() => {
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-receipt"></i>
-                    <p>No expenses tracked yet. Click "Add Expense" to start.</p>
+                    <p>No expenses tracked yet.</p>
+                    <button class="btn btn-small" onclick="Budget.openExpenseModal()"><i class="fa-solid fa-plus"></i> Add Expense</button>
                 </div>
             `;
             return;

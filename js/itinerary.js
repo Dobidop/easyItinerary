@@ -252,7 +252,8 @@ const Itinerary = (() => {
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-calendar-plus"></i>
-                    <p>No days planned yet. Set your trip dates in Overview or click "Add Day" to start planning.</p>
+                    <p>No days planned yet. Set your trip dates in Overview to auto-generate days.</p>
+                    <button class="btn btn-small" onclick="Itinerary.addDay()"><i class="fa-solid fa-plus"></i> Add Day</button>
                 </div>
             `;
             updateDayFilter();
