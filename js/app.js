@@ -245,7 +245,7 @@ const App = (() => {
         document.getElementById('btnAddReservation').addEventListener('click', () => openReservationModal(null));
         document.getElementById('btnSaveReservation').addEventListener('click', saveReservation);
         document.getElementById('reservationType').addEventListener('change', () => {
-            toggleReservationDates();
+            toggleReservationFields();
             populateReservationResources();
         });
         document.getElementById('reservationLinkedResource').addEventListener('change', onReservationResourceSelected);
@@ -334,7 +334,6 @@ const App = (() => {
         (currentTrip.resources || []).forEach((res, idx) => {
             // Show matching resources first, but include all
             const match = matchCategories.length === 0 || matchCategories.includes(res.category);
-            const prefix = match ? '' : '';
             const opt = document.createElement('option');
             opt.value = idx;
             opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
@@ -367,16 +366,29 @@ const App = (() => {
         }
     }
 
-    function toggleReservationDates() {
+    function toggleReservationFields() {
         const type = document.getElementById('reservationType').value;
-        const row = document.getElementById('reservationDatesRow');
-        row.style.display = type === 'hotel' ? 'flex' : 'none';
+        document.getElementById('flightFieldsRow').style.display = type === 'flight' ? '' : 'none';
+        document.getElementById('transportFieldsRow').style.display = (type === 'train' || type === 'bus') ? '' : 'none';
+        document.getElementById('hotelFieldsRow').style.display = type === 'hotel' ? '' : 'none';
+        document.getElementById('genericDateRow').style.display = (type === 'rental' || type === 'other') ? '' : 'none';
     }
 
     function openReservationModal(idx) {
         editingReservationIdx = idx;
         const modal = document.getElementById('reservationModal');
         const title = document.getElementById('reservationModalTitle');
+
+        // All field IDs for easy clearing
+        const fields = [
+            'reservationType', 'reservationTitle', 'reservationProvider', 'reservationConfirmation',
+            'reservationDate', 'reservationTime', 'reservationCost', 'reservationNotes', 'reservationLink',
+            'reservationCheckIn', 'reservationCheckOut', 'reservationCheckInTime', 'reservationCheckOutTime',
+            'reservationDepAirport', 'reservationArrAirport', 'reservationFlightNo', 'reservationSeat',
+            'reservationTerminal', 'reservationDepTime', 'reservationArrTime',
+            'reservationDepStation', 'reservationArrStation', 'reservationTransDepTime', 'reservationTransArrTime',
+            'reservationServiceNo', 'reservationLinkedResource',
+        ];
 
         if (idx !== null && idx !== undefined) {
             title.textContent = 'Edit Reservation';
@@ -390,26 +402,40 @@ const App = (() => {
             document.getElementById('reservationCost').value = res.cost || '';
             document.getElementById('reservationNotes').value = res.notes || '';
             document.getElementById('reservationLink').value = res.link || '';
+            // Hotel fields
             document.getElementById('reservationCheckIn').value = res.checkIn || '';
             document.getElementById('reservationCheckOut').value = res.checkOut || '';
+            document.getElementById('reservationCheckInTime').value = res.checkInTime || '';
+            document.getElementById('reservationCheckOutTime').value = res.checkOutTime || '';
+            // Flight fields
+            document.getElementById('reservationDepAirport').value = res.depAirport || '';
+            document.getElementById('reservationArrAirport').value = res.arrAirport || '';
+            document.getElementById('reservationFlightNo').value = res.flightNo || '';
+            document.getElementById('reservationSeat').value = res.seat || '';
+            document.getElementById('reservationTerminal').value = res.terminal || '';
+            document.getElementById('reservationDepTime').value = res.depTime || '';
+            document.getElementById('reservationArrTime').value = res.arrTime || '';
+            // Transport fields
+            document.getElementById('reservationDepStation').value = res.depStation || '';
+            document.getElementById('reservationArrStation').value = res.arrStation || '';
+            document.getElementById('reservationTransDepTime').value = res.transDepTime || '';
+            document.getElementById('reservationTransArrTime').value = res.transArrTime || '';
+            document.getElementById('reservationServiceNo').value = res.serviceNo || '';
             document.getElementById('reservationLinkedResource').value = res.linkedResourceIdx !== undefined ? res.linkedResourceIdx : '';
         } else {
             title.textContent = 'Add Reservation';
+            // Clear all fields
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
+            });
             document.getElementById('reservationType').value = 'flight';
-            document.getElementById('reservationTitle').value = '';
-            document.getElementById('reservationProvider').value = '';
-            document.getElementById('reservationConfirmation').value = '';
-            document.getElementById('reservationDate').value = currentTrip.startDate || '';
-            document.getElementById('reservationTime').value = '';
-            document.getElementById('reservationCost').value = '';
-            document.getElementById('reservationNotes').value = '';
-            document.getElementById('reservationLink').value = '';
             document.getElementById('reservationCheckIn').value = currentTrip.startDate || '';
             document.getElementById('reservationCheckOut').value = currentTrip.endDate || '';
-            document.getElementById('reservationLinkedResource').value = '';
+            document.getElementById('reservationDate').value = currentTrip.startDate || '';
         }
         populateReservationResources();
-        toggleReservationDates();
+        toggleReservationFields();
         modal.classList.add('open');
     }
 
@@ -427,15 +453,40 @@ const App = (() => {
             title,
             provider: document.getElementById('reservationProvider').value,
             confirmation: document.getElementById('reservationConfirmation').value,
-            date: document.getElementById('reservationDate').value,
-            time: document.getElementById('reservationTime').value,
             cost: parseFloat(document.getElementById('reservationCost').value) || 0,
             notes: document.getElementById('reservationNotes').value,
             link: document.getElementById('reservationLink').value,
-            checkIn: type === 'hotel' ? document.getElementById('reservationCheckIn').value : '',
-            checkOut: type === 'hotel' ? document.getElementById('reservationCheckOut').value : '',
             linkedResourceIdx: document.getElementById('reservationLinkedResource').value || null,
         };
+
+        // Type-specific fields
+        if (type === 'flight') {
+            reservation.depAirport = document.getElementById('reservationDepAirport').value;
+            reservation.arrAirport = document.getElementById('reservationArrAirport').value;
+            reservation.flightNo = document.getElementById('reservationFlightNo').value;
+            reservation.seat = document.getElementById('reservationSeat').value;
+            reservation.terminal = document.getElementById('reservationTerminal').value;
+            reservation.depTime = document.getElementById('reservationDepTime').value;
+            reservation.arrTime = document.getElementById('reservationArrTime').value;
+            // Derive date from departure for sorting
+            reservation.date = reservation.depTime ? reservation.depTime.split('T')[0] : '';
+        } else if (type === 'hotel') {
+            reservation.checkIn = document.getElementById('reservationCheckIn').value;
+            reservation.checkOut = document.getElementById('reservationCheckOut').value;
+            reservation.checkInTime = document.getElementById('reservationCheckInTime').value;
+            reservation.checkOutTime = document.getElementById('reservationCheckOutTime').value;
+            reservation.date = reservation.checkIn || '';
+        } else if (type === 'train' || type === 'bus') {
+            reservation.depStation = document.getElementById('reservationDepStation').value;
+            reservation.arrStation = document.getElementById('reservationArrStation').value;
+            reservation.transDepTime = document.getElementById('reservationTransDepTime').value;
+            reservation.transArrTime = document.getElementById('reservationTransArrTime').value;
+            reservation.serviceNo = document.getElementById('reservationServiceNo').value;
+            reservation.date = reservation.transDepTime ? reservation.transDepTime.split('T')[0] : '';
+        } else {
+            reservation.date = document.getElementById('reservationDate').value;
+            reservation.time = document.getElementById('reservationTime').value;
+        }
 
         if (editingReservationIdx !== null) {
             currentTrip.reservations[editingReservationIdx] = reservation;
@@ -476,28 +527,50 @@ const App = (() => {
             other: { icon: 'fa-ellipsis', class: 'other' },
         };
 
-        // Sort by date (check-in for hotels, date for others), then by time
+        // Sort by effective date/time across all reservation types
+        function getSortKey(r) {
+            if (r.type === 'flight' && r.depTime) return r.depTime;
+            if ((r.type === 'train' || r.type === 'bus') && r.transDepTime) return r.transDepTime;
+            if (r.type === 'hotel' && r.checkIn) return r.checkIn + 'T' + (r.checkInTime || '23:59');
+            return (r.date || '') + 'T' + (r.time || '00:00');
+        }
         const sorted = currentTrip.reservations
             .map((res, idx) => ({ ...res, _idx: idx }))
-            .sort((a, b) => {
-                const dateA = (a.type === 'hotel' && a.checkIn) ? a.checkIn : (a.date || '');
-                const dateB = (b.type === 'hotel' && b.checkIn) ? b.checkIn : (b.date || '');
-                if (dateA !== dateB) return dateA.localeCompare(dateB);
-                return (a.time || '').localeCompare(b.time || '');
-            });
+            .sort((a, b) => getSortKey(a).localeCompare(getSortKey(b)));
 
         container.innerHTML = sorted.map((res) => {
             const idx = res._idx;
             const t = typeIcons[res.type] || typeIcons.other;
             const sym = Budget.getCurrencySymbol(currentTrip.budgetCurrency);
 
-            // Build date display
-            let dateDisplay = '';
-            if (res.type === 'hotel' && res.checkIn && res.checkOut) {
-                const nights = Math.ceil((new Date(res.checkOut) - new Date(res.checkIn)) / (1000*60*60*24));
-                dateDisplay = `<span><i class="fa-regular fa-calendar"></i> ${res.checkIn} → ${res.checkOut}${nights > 0 ? ` (${nights} night${nights !== 1 ? 's' : ''})` : ''}</span>`;
-            } else if (res.date) {
-                dateDisplay = `<span><i class="fa-regular fa-calendar"></i> ${res.date}</span>`;
+            // Build type-specific detail lines
+            let detailsHtml = '';
+
+            if (res.type === 'flight') {
+                const route = (res.depAirport || res.arrAirport)
+                    ? `<span><i class="fa-solid fa-route"></i> ${escapeHtml(res.depAirport || '?')} → ${escapeHtml(res.arrAirport || '?')}</span>` : '';
+                const flightNo = res.flightNo ? `<span><i class="fa-solid fa-hashtag"></i> ${escapeHtml(res.flightNo)}</span>` : '';
+                const depArr = formatDepArr(res.depTime, res.arrTime);
+                const seat = res.seat ? `<span><i class="fa-solid fa-chair"></i> ${escapeHtml(res.seat)}</span>` : '';
+                const terminal = res.terminal ? `<span><i class="fa-solid fa-signs-post"></i> ${escapeHtml(res.terminal)}</span>` : '';
+                detailsHtml = [route, flightNo, depArr, seat, terminal].filter(Boolean).join('');
+            } else if (res.type === 'hotel') {
+                const nights = (res.checkIn && res.checkOut) ? Math.ceil((new Date(res.checkOut) - new Date(res.checkIn)) / (1000*60*60*24)) : 0;
+                const dates = (res.checkIn && res.checkOut)
+                    ? `<span><i class="fa-regular fa-calendar"></i> ${res.checkIn} → ${res.checkOut}${nights > 0 ? ` (${nights}n)` : ''}</span>` : '';
+                const ciTime = res.checkInTime ? `<span><i class="fa-solid fa-right-to-bracket"></i> Check-in ${res.checkInTime}</span>` : '';
+                const coTime = res.checkOutTime ? `<span><i class="fa-solid fa-right-from-bracket"></i> Check-out ${res.checkOutTime}</span>` : '';
+                detailsHtml = [dates, ciTime, coTime].filter(Boolean).join('');
+            } else if (res.type === 'train' || res.type === 'bus') {
+                const route = (res.depStation || res.arrStation)
+                    ? `<span><i class="fa-solid fa-route"></i> ${escapeHtml(res.depStation || '?')} → ${escapeHtml(res.arrStation || '?')}</span>` : '';
+                const serviceNo = res.serviceNo ? `<span><i class="fa-solid fa-hashtag"></i> ${escapeHtml(res.serviceNo)}</span>` : '';
+                const depArr = formatDepArr(res.transDepTime, res.transArrTime);
+                detailsHtml = [route, serviceNo, depArr].filter(Boolean).join('');
+            } else {
+                const dateDisplay = res.date ? `<span><i class="fa-regular fa-calendar"></i> ${res.date}</span>` : '';
+                const timeDisplay = res.time ? `<span><i class="fa-regular fa-clock"></i> ${res.time}</span>` : '';
+                detailsHtml = [dateDisplay, timeDisplay].filter(Boolean).join('');
             }
 
             return `
@@ -507,11 +580,10 @@ const App = (() => {
                         <h4>${escapeHtml(res.title)}</h4>
                         <div class="reservation-meta">
                             ${res.provider ? `<span>${escapeHtml(res.provider)}</span>` : ''}
-                            ${dateDisplay}
-                            ${res.time ? `<span><i class="fa-regular fa-clock"></i> ${res.time}</span>` : ''}
+                            ${detailsHtml}
                             ${res.cost ? `<span>${sym}${res.cost}</span>` : ''}
                         </div>
-                        ${res.confirmation ? `<span class="reservation-confirmation" onclick="navigator.clipboard.writeText('${escapeHtml(res.confirmation)}'); showToast('Copied')" title="Click to copy">${escapeHtml(res.confirmation)}</span>` : ''}
+                        ${res.confirmation ? `<span class="reservation-confirmation" onclick="navigator.clipboard.writeText('${escapeHtml(res.confirmation)}'); showToast('Copied')" title="Click to copy"><i class="fa-solid fa-copy"></i> ${escapeHtml(res.confirmation)}</span>` : ''}
                     </div>
                     <div class="reservation-actions">
                         ${res.link ? `<button onclick="window.open('${escapeHtml(res.link)}', '_blank')" title="Open link"><i class="fa-solid fa-external-link"></i></button>` : ''}
@@ -654,6 +726,19 @@ const App = (() => {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    // Format departure/arrival datetime-local values into a readable string
+    function formatDepArr(dep, arr) {
+        if (!dep && !arr) return '';
+        const fmt = (dt) => {
+            if (!dt) return '?';
+            // datetime-local is "YYYY-MM-DDThh:mm"
+            const [date, time] = dt.split('T');
+            if (!time) return date;
+            return `${date} ${time}`;
+        };
+        return `<span><i class="fa-regular fa-clock"></i> ${fmt(dep)} → ${fmt(arr)}</span>`;
     }
 
     return {

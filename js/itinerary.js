@@ -269,7 +269,9 @@ const Itinerary = (() => {
                 const isCheckIn = res.checkIn === day.date;
                 const isCheckOut = res.checkOut === day.date;
                 let label = '';
-                if (isCheckIn) label = 'Check-in';
+                if (isCheckIn && res.checkInTime) label = `Check-in ${res.checkInTime}`;
+                else if (isCheckIn) label = 'Check-in';
+                else if (isCheckOut && res.checkOutTime) label = `Check-out ${res.checkOutTime}`;
                 else if (isCheckOut) label = 'Check-out';
                 return `
                     <div class="lodging-banner">
