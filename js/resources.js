@@ -33,6 +33,10 @@ const Resources = (() => {
                 // Re-open modal
                 document.getElementById('resourceModal').classList.add('open');
                 showToast('Location picked!');
+                // Fetch place details in background
+                fetchPlaceDetails(lat, lng).then(details => {
+                    if (details) applyPlaceDetails(details);
+                });
             });
         });
 
@@ -61,6 +65,7 @@ const Resources = (() => {
 
     function openModal(idx, skipClear) {
         editingIdx = idx;
+        pendingDetails = null;
         const modal = document.getElementById('resourceModal');
         document.getElementById('resourceUrlHint').classList.remove('visible');
         document.getElementById('resourceUrlHint').innerHTML = '';
@@ -111,20 +116,25 @@ const Resources = (() => {
                     document.getElementById('resourceTitle').value = data.name;
                 }
 
-                // Reverse geocode to get address details
-                reverseGeocode(data.lat, data.lng).then(info => {
-                    if (info && !document.getElementById('resourceTitle').value.trim()) {
-                        document.getElementById('resourceTitle').value = info.name || info.display_name.split(',')[0];
-                    }
-                    hint.innerHTML = '<i class="fa-solid fa-check"></i> Location data extracted!';
-                    setTimeout(() => hint.classList.remove('visible'), 3000);
-                });
+                // Show success immediately — user can save right away
+                const displayName = data.name || 'Location';
+                hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(displayName)}</strong>`;
 
-                // If we already have a name, just show success
-                if (data.name) {
-                    hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(data.name)}</strong>`;
-                    setTimeout(() => hint.classList.remove('visible'), 4000);
+                // Reverse geocode for title if we don't have a name
+                if (!data.name) {
+                    reverseGeocode(data.lat, data.lng).then(info => {
+                        if (info && !document.getElementById('resourceTitle').value.trim()) {
+                            document.getElementById('resourceTitle').value = info.name || info.display_name.split(',')[0];
+                        }
+                    });
                 }
+
+                // Fetch OSM details in background — non-blocking, just enriches if found
+                fetchPlaceDetails(data.lat, data.lng).then(details => {
+                    if (details) {
+                        applyPlaceDetails(details);
+                    }
+                });
                 return;
             }
         }
@@ -201,6 +211,87 @@ const Resources = (() => {
         .catch(() => null);
     }
 
+    /* ===== Fetch place details from Overpass (OSM tags) ===== */
+    function fetchPlaceDetails(lat, lng) {
+        // Query nearby POIs within ~30m radius for tags like opening_hours, phone, cuisine, etc.
+        const radius = 30;
+        const query = `
+            [out:json][timeout:10];
+            (
+                nwr(around:${radius},${lat},${lng})["name"];
+            );
+            out tags center 1;
+        `;
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 8000); // 8s timeout
+        return fetch('https://overpass-api.de/api/interpreter', {
+            method: 'POST',
+            body: 'data=' + encodeURIComponent(query),
+            signal: controller.signal,
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.elements || data.elements.length === 0) return null;
+            // Pick the most relevant element (prefer the one with the most tags)
+            const best = data.elements.reduce((a, b) =>
+                Object.keys(b.tags || {}).length > Object.keys(a.tags || {}).length ? b : a
+            );
+            const t = best.tags || {};
+            return {
+                phone: t.phone || t['contact:phone'] || '',
+                website: t.website || t['contact:website'] || '',
+                openingHours: t.opening_hours || '',
+                cuisine: t.cuisine ? t.cuisine.replace(/;/g, ', ') : '',
+                address: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' ')
+                    + (t['addr:city'] ? ', ' + t['addr:city'] : ''),
+                stars: t.stars || '',
+                internetAccess: t.internet_access || '',
+                wheelchair: t.wheelchair || '',
+                osmType: t.tourism || t.amenity || t.shop || '',
+            };
+        })
+        .catch(() => null);
+    }
+
+    function applyPlaceDetails(details) {
+        if (!details) return;
+        const hint = document.getElementById('resourceUrlHint');
+        const parts = [];
+        if (details.cuisine) parts.push(`<i class="fa-solid fa-utensils"></i> ${escapeHtml(details.cuisine)}`);
+        if (details.openingHours) parts.push(`<i class="fa-regular fa-clock"></i> ${escapeHtml(details.openingHours)}`);
+        if (details.phone) parts.push(`<i class="fa-solid fa-phone"></i> ${escapeHtml(details.phone)}`);
+        if (details.stars) parts.push(`<i class="fa-solid fa-star"></i> ${escapeHtml(details.stars)} stars`);
+        if (details.website && !document.getElementById('resourceUrl').value.trim()) {
+            document.getElementById('resourceUrl').value = details.website;
+        }
+        if (details.address && !document.getElementById('resourceNotes').value.trim()) {
+            document.getElementById('resourceNotes').value = details.address;
+        }
+        // Auto-detect category from OSM type
+        if (document.getElementById('resourceCategory').value === 'general' && details.osmType) {
+            const cat = guessCategoryFromOsm(details.osmType);
+            if (cat) document.getElementById('resourceCategory').value = cat;
+        }
+        if (parts.length > 0) {
+            hint.innerHTML = `<div class="place-details-preview">${parts.join('<span class="detail-sep">·</span>')}</div>`;
+            hint.classList.add('visible');
+        }
+        // Store on a temp property so saveResource can grab it
+        pendingDetails = details;
+    }
+
+    let pendingDetails = null;
+
+    function guessCategoryFromOsm(osmType) {
+        const map = {
+            restaurant: 'restaurant', cafe: 'restaurant', bar: 'restaurant', pub: 'restaurant', fast_food: 'restaurant',
+            hotel: 'hotel', hostel: 'hotel', guest_house: 'hotel', motel: 'hotel',
+            museum: 'sightseeing', attraction: 'sightseeing', viewpoint: 'sightseeing', artwork: 'sightseeing',
+            supermarket: 'shopping', clothes: 'shopping', mall: 'shopping',
+        };
+        return map[osmType] || null;
+    }
+
     function saveResource() {
         const title = document.getElementById('resourceTitle').value.trim();
         if (!title) {
@@ -230,6 +321,22 @@ const Resources = (() => {
             lat,
             lng,
         };
+
+        // Merge in place details if we fetched them
+        if (pendingDetails) {
+            if (pendingDetails.phone) resource.phone = pendingDetails.phone;
+            if (pendingDetails.openingHours) resource.openingHours = pendingDetails.openingHours;
+            if (pendingDetails.cuisine) resource.cuisine = pendingDetails.cuisine;
+            if (pendingDetails.stars) resource.stars = pendingDetails.stars;
+            pendingDetails = null;
+        } else if (editingIdx !== null) {
+            // Preserve existing details on edit
+            const existing = currentTrip.resources[editingIdx];
+            if (existing.phone) resource.phone = existing.phone;
+            if (existing.openingHours) resource.openingHours = existing.openingHours;
+            if (existing.cuisine) resource.cuisine = existing.cuisine;
+            if (existing.stars) resource.stars = existing.stars;
+        }
 
         if (editingIdx !== null) {
             currentTrip.resources[editingIdx] = resource;
@@ -278,6 +385,13 @@ const Resources = (() => {
             const iconClass = categoryIcons[res.category] || 'fa-link';
             let urlDisplay = '';
             try { urlDisplay = res.url ? new URL(res.url).hostname : ''; } catch(e) { urlDisplay = res.url || ''; }
+            // Build detail tags
+            const detailTags = [];
+            if (res.cuisine) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-utensils"></i> ${escapeHtml(res.cuisine)}</span>`);
+            if (res.openingHours) detailTags.push(`<span class="resource-detail"><i class="fa-regular fa-clock"></i> ${escapeHtml(res.openingHours)}</span>`);
+            if (res.phone) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-phone"></i> ${escapeHtml(res.phone)}</span>`);
+            if (res.stars) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-star"></i> ${escapeHtml(res.stars)} stars</span>`);
+
             return `
                 <div class="resource-card">
                     <div class="resource-icon ${res.category}">
@@ -286,6 +400,7 @@ const Resources = (() => {
                     <div class="resource-info">
                         <h4>${res.url ? `<a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.title)}</a>` : escapeHtml(res.title)}</h4>
                         ${res.url ? `<span class="resource-url">${escapeHtml(urlDisplay)}</span>` : ''}
+                        ${detailTags.length ? `<div class="resource-details">${detailTags.join('')}</div>` : ''}
                         ${res.notes ? `<div class="resource-notes">${escapeHtml(res.notes)}</div>` : ''}
                     </div>
                     <div class="resource-actions">
@@ -317,6 +432,13 @@ const Resources = (() => {
         render();
     }
 
+    function fetchAndApplyDetails(lat, lng) {
+        // Background fetch — no spinner, just enriches if found
+        fetchPlaceDetails(lat, lng).then(details => {
+            if (details) applyPlaceDetails(details);
+        });
+    }
+
     return {
         init,
         update,
@@ -325,5 +447,6 @@ const Resources = (() => {
         saveResource,
         deleteResource,
         copyUrl,
+        fetchAndApplyDetails,
     };
 })();

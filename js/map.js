@@ -296,8 +296,9 @@ const MapModule = (() => {
         document.getElementById('resourceLat').value = parseFloat(r.lat).toFixed(6);
         document.getElementById('resourceLng').value = parseFloat(r.lon).toFixed(6);
 
-        // Open modal
+        // Open modal and fetch place details
         Resources.openModal(null, true); // true = skip clearing fields
+        Resources.fetchAndApplyDetails(parseFloat(r.lat), parseFloat(r.lon));
         resultsEl.classList.remove('open');
     }
 

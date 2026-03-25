@@ -1091,6 +1091,41 @@ body {
 }
 .resource-notes { font-size: 12px; color: var(--text-secondary); }
 
+.resource-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: 3px;
+}
+.resource-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.resource-detail i {
+    margin-right: 3px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+/* Place details preview in modal */
+.place-details-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 6px 0;
+}
+.place-details-preview i {
+    margin-right: 3px;
+    opacity: 0.7;
+}
+.detail-sep {
+    color: var(--text-muted);
+    margin: 0 2px;
+}
+
 .resource-actions {
     display: flex;
     gap: 4px;
