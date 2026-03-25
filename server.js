@@ -100,6 +100,7 @@ const server = http.createServer(async (req, res) => {
             const shared = {
                 trip,
                 sharedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 shareId,
             };
 
@@ -107,7 +108,7 @@ const server = http.createServer(async (req, res) => {
             const isUpdate = trip.shareId === shareId;
             console.log(`${isUpdate ? 'Updated' : 'Shared'} trip "${trip.name}" as ${shareId}`);
 
-            sendJson(res, 200, { shareId, url: `/?trip=${shareId}` });
+            sendJson(res, 200, { shareId, url: `/?trip=${shareId}`, updatedAt: shared.updatedAt });
         } catch (err) {
             console.error('Share error:', err.message);
             sendJson(res, 400, { error: 'Failed to share trip' });

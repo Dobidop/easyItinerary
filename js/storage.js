@@ -79,12 +79,19 @@ const Storage = (() => {
     let syncTimer = null;
     function syncSharedTrip(trip) {
         clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => {
-            fetch('/api/share', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(trip),
-            }).catch(() => { /* silent fail for background sync */ });
+        syncTimer = setTimeout(async () => {
+            try {
+                const res = await fetch('/api/share', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(trip),
+                });
+                if (res.ok) {
+                    const result = await res.json();
+                    // Track our own update so polling doesn't re-download it
+                    lastKnownUpdatedAt = result.updatedAt;
+                }
+            } catch { /* silent fail for background sync */ }
         }, 2000);
     }
 
@@ -157,19 +164,87 @@ const Storage = (() => {
         if (!res.ok) throw new Error('Shared trip not found');
         const data = await res.json();
         const trip = data.trip;
-        // Assign new ID and clear shareId to avoid conflicts
-        trip.id = generateId();
-        delete trip.shareId;
+
+        // Check if we already have this shared trip locally
         const store = getAll();
+        const existing = store.trips.find(t => t.shareId === shareId);
+        if (existing) {
+            // Update existing local copy with server data
+            Object.assign(existing, trip);
+            existing.shareId = shareId;
+            store.activeTripId = existing.id;
+            saveAll(store);
+            lastKnownUpdatedAt = data.updatedAt || null;
+            return existing;
+        }
+
+        // New shared trip — assign new local ID but keep shareId for syncing
+        trip.id = generateId();
+        trip.shareId = shareId;
         store.trips.push(trip);
         store.activeTripId = trip.id;
         saveAll(store);
+        lastKnownUpdatedAt = data.updatedAt || null;
         return trip;
     }
 
     function checkForSharedTrip() {
         const params = new URLSearchParams(window.location.search);
         return params.get('trip');
+    }
+
+    // === Sync polling for collaborative editing ===
+    let pollInterval = null;
+    let lastKnownUpdatedAt = null;
+    let onRemoteUpdateCallback = null;
+
+    function startSyncPolling(trip, onRemoteUpdate) {
+        stopSyncPolling();
+        if (!trip.shareId) return;
+
+        onRemoteUpdateCallback = onRemoteUpdate;
+
+        pollInterval = setInterval(async () => {
+            if (!trip.shareId) return;
+            try {
+                const res = await fetch(`/api/share/${encodeURIComponent(trip.shareId)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Only update if the server version is newer than what we last saw
+                if (data.updatedAt && data.updatedAt !== lastKnownUpdatedAt) {
+                    lastKnownUpdatedAt = data.updatedAt;
+                    const remoteTrip = data.trip;
+
+                    // Preserve local ID and shareId
+                    const localId = trip.id;
+                    const shareId = trip.shareId;
+                    Object.assign(trip, remoteTrip);
+                    trip.id = localId;
+                    trip.shareId = shareId;
+
+                    // Save locally without triggering another sync upload
+                    const store = getAll();
+                    const idx = store.trips.findIndex(t => t.id === trip.id);
+                    if (idx >= 0) store.trips[idx] = trip;
+                    store.activeTripId = trip.id;
+                    saveAll(store);
+
+                    if (onRemoteUpdateCallback) {
+                        onRemoteUpdateCallback(trip);
+                    }
+                }
+            } catch {
+                /* silent fail for polling */
+            }
+        }, 5000); // Poll every 5 seconds
+    }
+
+    function stopSyncPolling() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
     }
 
     return {
@@ -184,6 +259,8 @@ const Storage = (() => {
         shareTrip,
         loadSharedTrip,
         checkForSharedTrip,
+        startSyncPolling,
+        stopSyncPolling,
         generateId,
     };
 })();

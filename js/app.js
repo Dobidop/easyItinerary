@@ -11,15 +11,23 @@ const App = (() => {
         if (shareId) {
             try {
                 currentTrip = await Storage.loadSharedTrip(shareId);
-                showToast(`Imported shared trip: ${currentTrip.name}`);
-                // Clean URL
-                window.history.replaceState({}, '', '/');
+                showToast(`Joined shared trip: ${currentTrip.name}`);
+                // Keep ?trip= in URL so refresh reconnects
             } catch {
                 showToast('Shared trip not found');
                 currentTrip = Storage.getActiveTrip();
             }
         } else {
             currentTrip = Storage.getActiveTrip();
+        }
+
+        // Start sync polling if this trip is shared
+        if (currentTrip.shareId) {
+            Storage.startSyncPolling(currentTrip, (updatedTrip) => {
+                currentTrip = updatedTrip;
+                reloadAll();
+                showToast('Trip updated by collaborator');
+            });
         }
 
         // Init all modules
@@ -178,7 +186,15 @@ const App = (() => {
                 const result = await Storage.shareTrip(currentTrip);
                 const shareUrl = `${window.location.origin}${result.url}`;
                 await navigator.clipboard.writeText(shareUrl);
-                showToast('Share link copied to clipboard!');
+                // Update URL to include share param
+                window.history.replaceState({}, '', result.url);
+                // Start sync polling if not already running
+                Storage.startSyncPolling(currentTrip, (updatedTrip) => {
+                    currentTrip = updatedTrip;
+                    reloadAll();
+                    showToast('Trip updated by collaborator');
+                });
+                showToast('Share link copied! Trip is now synced.');
             } catch (err) {
                 showToast('Failed to share trip');
             }
