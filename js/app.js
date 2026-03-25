@@ -331,11 +331,11 @@ const App = (() => {
         };
         const matchCategories = categoryMap[type] || [];
 
-        (currentTrip.resources || []).forEach((res, idx) => {
+        (currentTrip.resources || []).forEach((res) => {
             // Show matching resources first, but include all
             const match = matchCategories.length === 0 || matchCategories.includes(res.category);
             const opt = document.createElement('option');
-            opt.value = idx;
+            opt.value = res.id;
             opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
             if (match) opt.style.fontWeight = '600';
             select.appendChild(opt);
@@ -343,16 +343,16 @@ const App = (() => {
     }
 
     function onReservationResourceSelected() {
-        const idx = document.getElementById('reservationLinkedResource').value;
-        if (idx === '') return;
-        const res = currentTrip.resources[parseInt(idx)];
+        const resId = document.getElementById('reservationLinkedResource').value;
+        if (resId === '') return;
+        const res = (currentTrip.resources || []).find(r => r.id === resId);
         if (!res) return;
 
         // Auto-set reservation type based on resource category
         const catToType = { hotel: 'hotel', transport: 'flight', restaurant: 'other', activity: 'other', general: 'other' };
         if (catToType[res.category]) {
             document.getElementById('reservationType').value = catToType[res.category];
-            toggleReservationDates();
+            toggleReservationFields();
         }
 
         if (!document.getElementById('reservationTitle').value.trim()) {
@@ -421,7 +421,7 @@ const App = (() => {
             document.getElementById('reservationTransDepTime').value = res.transDepTime || '';
             document.getElementById('reservationTransArrTime').value = res.transArrTime || '';
             document.getElementById('reservationServiceNo').value = res.serviceNo || '';
-            document.getElementById('reservationLinkedResource').value = res.linkedResourceIdx !== undefined ? res.linkedResourceIdx : '';
+            document.getElementById('reservationLinkedResource').value = res.linkedResourceId || res.linkedResourceIdx || '';
         } else {
             title.textContent = 'Add Reservation';
             // Clear all fields
@@ -456,7 +456,7 @@ const App = (() => {
             cost: parseFloat(document.getElementById('reservationCost').value) || 0,
             notes: document.getElementById('reservationNotes').value,
             link: document.getElementById('reservationLink').value,
-            linkedResourceIdx: document.getElementById('reservationLinkedResource').value || null,
+            linkedResourceId: document.getElementById('reservationLinkedResource').value || null,
         };
 
         // Type-specific fields

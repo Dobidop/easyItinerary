@@ -22,9 +22,9 @@ const Itinerary = (() => {
 
         // Resource linker for activities
         document.getElementById('activityLinkedResource').addEventListener('change', () => {
-            const idx = document.getElementById('activityLinkedResource').value;
-            if (idx === '') return;
-            const res = currentTrip.resources[parseInt(idx)];
+            const resId = document.getElementById('activityLinkedResource').value;
+            if (resId === '') return;
+            const res = (currentTrip.resources || []).find(r => r.id === resId);
             if (!res) return;
 
             if (!document.getElementById('activityTitle').value.trim()) {
@@ -54,9 +54,9 @@ const Itinerary = (() => {
     function populateActivityResources() {
         const select = document.getElementById('activityLinkedResource');
         select.innerHTML = '<option value="">— None —</option>';
-        (currentTrip.resources || []).forEach((res, idx) => {
+        (currentTrip.resources || []).forEach((res) => {
             const opt = document.createElement('option');
-            opt.value = idx;
+            opt.value = res.id;
             opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
             select.appendChild(opt);
         });
@@ -134,7 +134,7 @@ const Itinerary = (() => {
             document.getElementById('activityAddress').value = act.address || '';
             document.getElementById('activityLat').value = act.lat || '';
             document.getElementById('activityLng').value = act.lng || '';
-            document.getElementById('activityLinkedResource').value = act.linkedResourceIdx !== undefined ? act.linkedResourceIdx : '';
+            document.getElementById('activityLinkedResource').value = act.linkedResourceId || act.linkedResourceIdx || '';
         } else {
             title.textContent = 'Add Activity';
             document.getElementById('activityTitle').value = '';
@@ -173,7 +173,7 @@ const Itinerary = (() => {
             address: document.getElementById('activityAddress').value,
             lat: parseFloat(document.getElementById('activityLat').value) || null,
             lng: parseFloat(document.getElementById('activityLng').value) || null,
-            linkedResourceIdx: document.getElementById('activityLinkedResource').value || null,
+            linkedResourceId: document.getElementById('activityLinkedResource').value || null,
         };
 
         if (actIdx !== null && actIdx !== undefined) {
