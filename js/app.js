@@ -214,6 +214,16 @@ const App = (() => {
             reloadAll();
         });
 
+        // Hide share button if server API is unavailable (e.g. GitHub Pages)
+        fetch('/api/share/test').then(r => {
+            // Server returns JSON with error — API is available
+            if (r.headers.get('content-type')?.includes('application/json')) return;
+            // Got back HTML (e.g. GitHub Pages 404 page) — no API
+            document.getElementById('btnShare').style.display = 'none';
+        }).catch(() => {
+            document.getElementById('btnShare').style.display = 'none';
+        });
+
         document.getElementById('btnShare').addEventListener('click', async () => {
             try {
                 const result = await Storage.shareTrip(currentTrip);
