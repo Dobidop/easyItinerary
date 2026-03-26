@@ -248,7 +248,7 @@ const App = (() => {
             toggleReservationFields();
             populateReservationResources();
         });
-        document.getElementById('reservationLinkedResource').addEventListener('change', onReservationResourceSelected);
+        initReservationPicker();
 
         // Checklist
         document.getElementById('btnAddChecklist').addEventListener('click', addChecklistItem);
@@ -315,55 +315,41 @@ const App = (() => {
     // ===== Reservations =====
     let editingReservationIdx = null;
 
-    function populateReservationResources() {
-        const select = document.getElementById('reservationLinkedResource');
-        const type = document.getElementById('reservationType').value;
-        select.innerHTML = '<option value="">— None —</option>';
+    let reservationPicker = null;
 
-        // Map reservation types to resource categories
-        const categoryMap = {
-            hotel: ['hotel'],
-            flight: ['transport'],
-            train: ['transport'],
-            bus: ['transport'],
-            rental: ['transport'],
-            other: [],
-        };
-        const matchCategories = categoryMap[type] || [];
-
-        (currentTrip.resources || []).forEach((res) => {
-            // Show matching resources first, but include all
-            const match = matchCategories.length === 0 || matchCategories.includes(res.category);
-            const opt = document.createElement('option');
-            opt.value = res.id;
-            opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
-            if (match) opt.style.fontWeight = '600';
-            select.appendChild(opt);
-        });
+    function initReservationPicker() {
+        reservationPicker = ResourcePicker.init(
+            document.getElementById('reservationResourcePicker'),
+            document.getElementById('reservationLinkedResource'),
+            {
+                getTrip: () => currentTrip,
+                onSelect: (_id, res) => {
+                    if (!res) return;
+                    const catToType = { hotel: 'hotel', transport: 'flight', restaurant: 'other', activity: 'other', general: 'other' };
+                    if (catToType[res.category]) {
+                        document.getElementById('reservationType').value = catToType[res.category];
+                        toggleReservationFields();
+                    }
+                    if (!document.getElementById('reservationTitle').value.trim()) {
+                        document.getElementById('reservationTitle').value = res.title;
+                    }
+                    if (res.url && !document.getElementById('reservationLink').value.trim()) {
+                        document.getElementById('reservationLink').value = res.url;
+                    }
+                    if (res.notes && !document.getElementById('reservationNotes').value.trim()) {
+                        document.getElementById('reservationNotes').value = res.notes;
+                    }
+                },
+            }
+        );
     }
 
-    function onReservationResourceSelected() {
-        const resId = document.getElementById('reservationLinkedResource').value;
-        if (resId === '') return;
-        const res = (currentTrip.resources || []).find(r => r.id === resId);
-        if (!res) return;
-
-        // Auto-set reservation type based on resource category
-        const catToType = { hotel: 'hotel', transport: 'flight', restaurant: 'other', activity: 'other', general: 'other' };
-        if (catToType[res.category]) {
-            document.getElementById('reservationType').value = catToType[res.category];
-            toggleReservationFields();
-        }
-
-        if (!document.getElementById('reservationTitle').value.trim()) {
-            document.getElementById('reservationTitle').value = res.title;
-        }
-        if (res.url && !document.getElementById('reservationLink').value.trim()) {
-            document.getElementById('reservationLink').value = res.url;
-        }
-        if (res.notes && !document.getElementById('reservationNotes').value.trim()) {
-            document.getElementById('reservationNotes').value = res.notes;
-        }
+    function populateReservationResources() {
+        if (!reservationPicker) return;
+        // Auto-filter to matching category based on reservation type
+        const type = document.getElementById('reservationType').value;
+        const typeToCategory = { hotel: 'hotel', flight: 'transport', train: 'transport', bus: 'transport', rental: 'transport' };
+        reservationPicker.setFilter(typeToCategory[type] || 'all');
     }
 
     function toggleReservationFields() {
@@ -387,7 +373,7 @@ const App = (() => {
             'reservationDepAirport', 'reservationArrAirport', 'reservationFlightNo', 'reservationSeat',
             'reservationTerminal', 'reservationDepTime', 'reservationArrTime',
             'reservationDepStation', 'reservationArrStation', 'reservationTransDepTime', 'reservationTransArrTime',
-            'reservationServiceNo', 'reservationLinkedResource',
+            'reservationServiceNo',
         ];
 
         if (idx !== null && idx !== undefined) {
@@ -421,7 +407,7 @@ const App = (() => {
             document.getElementById('reservationTransDepTime').value = res.transDepTime || '';
             document.getElementById('reservationTransArrTime').value = res.transArrTime || '';
             document.getElementById('reservationServiceNo').value = res.serviceNo || '';
-            document.getElementById('reservationLinkedResource').value = res.linkedResourceId || res.linkedResourceIdx || '';
+            reservationPicker.setValue(res.linkedResourceId || res.linkedResourceIdx || '');
         } else {
             title.textContent = 'Add Reservation';
             // Clear all fields
@@ -433,6 +419,7 @@ const App = (() => {
             document.getElementById('reservationCheckIn').value = currentTrip.startDate || '';
             document.getElementById('reservationCheckOut').value = currentTrip.endDate || '';
             document.getElementById('reservationDate').value = currentTrip.startDate || '';
+            reservationPicker.clear();
         }
         populateReservationResources();
         toggleReservationFields();
@@ -768,6 +755,152 @@ function showToast(message) {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+// ===== Resource Picker (shared component) =====
+const ResourcePicker = (() => {
+    const categoryIcons = {
+        restaurant: 'fa-utensils', hotel: 'fa-bed', sightseeing: 'fa-camera',
+        transport: 'fa-plane', activity: 'fa-person-hiking', shopping: 'fa-bag-shopping', general: 'fa-link',
+    };
+
+    function init(pickerEl, hiddenInput, { onSelect, getTrip }) {
+        const searchInput = pickerEl.querySelector('.resource-picker-search');
+        const clearBtn = pickerEl.querySelector('.resource-picker-clear');
+        const listEl = pickerEl.querySelector('.resource-picker-list');
+        const filterBtns = pickerEl.querySelectorAll('.rpf-btn');
+        let activeFilter = 'all';
+
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeFilter = btn.dataset.cat;
+                renderList();
+            });
+        });
+
+        searchInput.addEventListener('input', () => renderList());
+        searchInput.addEventListener('focus', () => {
+            listEl.style.display = '';
+            renderList();
+        });
+
+        clearBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            hiddenInput.value = '';
+            searchInput.value = '';
+            searchInput.placeholder = 'Search resources...';
+            clearBtn.style.display = 'none';
+            listEl.style.display = '';
+            renderList();
+        });
+
+        // Close list when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.resource-picker') || !pickerEl.contains(e.target)) {
+                listEl.style.display = 'none';
+            }
+        });
+
+        function renderList() {
+            const trip = getTrip();
+            const resources = trip?.resources || [];
+            const query = searchInput.value.toLowerCase().trim();
+
+            let filtered = resources;
+            if (activeFilter !== 'all') {
+                filtered = filtered.filter(r => r.category === activeFilter);
+            }
+            if (query) {
+                filtered = filtered.filter(r =>
+                    (r.title || '').toLowerCase().includes(query) ||
+                    (r.category || '').toLowerCase().includes(query) ||
+                    (r.notes || '').toLowerCase().includes(query) ||
+                    (r.cuisine || '').toLowerCase().includes(query)
+                );
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div class="rp-empty">No matching resources</div>';
+                listEl.style.display = '';
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(res => {
+                const icon = categoryIcons[res.category] || 'fa-link';
+                const selected = hiddenInput.value === res.id;
+                return `
+                    <div class="rp-item ${selected ? 'selected' : ''}" data-id="${res.id}">
+                        <i class="fa-solid ${icon} rp-item-icon ${res.category}"></i>
+                        <div class="rp-item-info">
+                            <span class="rp-item-title">${escapeHtml(res.title)}</span>
+                            ${res.cuisine ? `<span class="rp-item-detail">${escapeHtml(res.cuisine)}</span>` : ''}
+                            ${res.openingHours ? `<span class="rp-item-detail"><i class="fa-regular fa-clock"></i> ${escapeHtml(res.openingHours)}</span>` : ''}
+                        </div>
+                        <span class="rp-item-cat">${res.category || 'general'}</span>
+                    </div>
+                `;
+            }).join('');
+            listEl.style.display = '';
+
+            // Bind click events
+            listEl.querySelectorAll('.rp-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = item.dataset.id;
+                    hiddenInput.value = id;
+                    const res = resources.find(r => r.id === id);
+                    if (res) {
+                        searchInput.value = res.title;
+                        clearBtn.style.display = '';
+                    }
+                    listEl.style.display = 'none';
+                    if (onSelect) onSelect(id, res);
+                });
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        return {
+            renderList,
+            setValue(id) {
+                const trip = getTrip();
+                const res = (trip?.resources || []).find(r => r.id === id);
+                if (res) {
+                    hiddenInput.value = id;
+                    searchInput.value = res.title;
+                    clearBtn.style.display = '';
+                } else {
+                    hiddenInput.value = '';
+                    searchInput.value = '';
+                    clearBtn.style.display = 'none';
+                }
+            },
+            clear() {
+                hiddenInput.value = '';
+                searchInput.value = '';
+                searchInput.placeholder = 'Search resources...';
+                clearBtn.style.display = 'none';
+            },
+            setFilter(cat) {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                const match = [...filterBtns].find(b => b.dataset.cat === cat);
+                if (match) match.classList.add('active');
+                else filterBtns[0]?.classList.add('active');
+                activeFilter = cat || 'all';
+                renderList();
+            },
+        };
+    }
+
+    return { init };
+})();
 
 // ===== Init on DOM ready =====
 document.addEventListener('DOMContentLoaded', () => {

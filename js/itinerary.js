@@ -20,46 +20,46 @@ const Itinerary = (() => {
             });
         });
 
-        // Resource linker for activities
-        document.getElementById('activityLinkedResource').addEventListener('change', () => {
-            const resId = document.getElementById('activityLinkedResource').value;
-            if (resId === '') return;
-            const res = (currentTrip.resources || []).find(r => r.id === resId);
-            if (!res) return;
+        // Resource picker for activities (initialized after DOM ready via initPicker)
+    }
 
-            if (!document.getElementById('activityTitle').value.trim()) {
-                document.getElementById('activityTitle').value = res.title;
-            }
-            if (res.url && !document.getElementById('activityLink').value.trim()) {
-                document.getElementById('activityLink').value = res.url;
-            }
-            if (res.notes && !document.getElementById('activityDescription').value.trim()) {
-                document.getElementById('activityDescription').value = res.notes;
-            }
-            if (res.lat && !document.getElementById('activityLat').value) {
-                document.getElementById('activityLat').value = res.lat;
-            }
-            if (res.lng && !document.getElementById('activityLng').value) {
-                document.getElementById('activityLng').value = res.lng;
-            }
+    let activityPicker = null;
 
-            // Map resource category to activity category
-            const catMap = { restaurant: 'food', hotel: 'lodging', sightseeing: 'sightseeing', transport: 'transport', activity: 'activity', shopping: 'shopping' };
-            if (catMap[res.category]) {
-                document.getElementById('activityCategory').value = catMap[res.category];
+    function initPicker() {
+        activityPicker = ResourcePicker.init(
+            document.getElementById('activityResourcePicker'),
+            document.getElementById('activityLinkedResource'),
+            {
+                getTrip: () => currentTrip,
+                onSelect: (_id, res) => {
+                    if (!res) return;
+                    if (!document.getElementById('activityTitle').value.trim()) {
+                        document.getElementById('activityTitle').value = res.title;
+                    }
+                    if (res.url && !document.getElementById('activityLink').value.trim()) {
+                        document.getElementById('activityLink').value = res.url;
+                    }
+                    if (res.notes && !document.getElementById('activityDescription').value.trim()) {
+                        document.getElementById('activityDescription').value = res.notes;
+                    }
+                    if (res.lat && !document.getElementById('activityLat').value) {
+                        document.getElementById('activityLat').value = res.lat;
+                    }
+                    if (res.lng && !document.getElementById('activityLng').value) {
+                        document.getElementById('activityLng').value = res.lng;
+                    }
+                    const catMap = { restaurant: 'food', hotel: 'lodging', sightseeing: 'sightseeing', transport: 'transport', activity: 'activity', shopping: 'shopping' };
+                    if (catMap[res.category]) {
+                        document.getElementById('activityCategory').value = catMap[res.category];
+                    }
+                },
             }
-        });
+        );
     }
 
     function populateActivityResources() {
-        const select = document.getElementById('activityLinkedResource');
-        select.innerHTML = '<option value="">— None —</option>';
-        (currentTrip.resources || []).forEach((res) => {
-            const opt = document.createElement('option');
-            opt.value = res.id;
-            opt.textContent = `${res.title}${res.category ? ' (' + res.category + ')' : ''}`;
-            select.appendChild(opt);
-        });
+        if (!activityPicker) initPicker();
+        activityPicker.renderList();
     }
 
     function generateDaysFromDates() {
@@ -134,7 +134,7 @@ const Itinerary = (() => {
             document.getElementById('activityAddress').value = act.address || '';
             document.getElementById('activityLat').value = act.lat || '';
             document.getElementById('activityLng').value = act.lng || '';
-            document.getElementById('activityLinkedResource').value = act.linkedResourceId || act.linkedResourceIdx || '';
+            activityPicker.setValue(act.linkedResourceId || act.linkedResourceIdx || '');
         } else {
             title.textContent = 'Add Activity';
             document.getElementById('activityTitle').value = '';
@@ -147,7 +147,7 @@ const Itinerary = (() => {
             document.getElementById('activityAddress').value = '';
             document.getElementById('activityLat').value = '';
             document.getElementById('activityLng').value = '';
-            document.getElementById('activityLinkedResource').value = '';
+            activityPicker.clear();
         }
         modal.classList.add('open');
     }

@@ -242,9 +242,23 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>Link a saved resource (optional)</label>
-                    <select id="activityLinkedResource" class="linked-resource-select">
-                        <option value="">— None —</option>
-                    </select>
+                    <div class="resource-picker" id="activityResourcePicker">
+                        <div class="resource-picker-input-row">
+                            <input type="text" class="resource-picker-search" placeholder="Search resources..." autocomplete="off" />
+                            <button type="button" class="resource-picker-clear" title="Clear" style="display:none"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="resource-picker-filters">
+                            <button type="button" class="rpf-btn active" data-cat="all">All</button>
+                            <button type="button" class="rpf-btn" data-cat="restaurant"><i class="fa-solid fa-utensils"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="hotel"><i class="fa-solid fa-bed"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="sightseeing"><i class="fa-solid fa-camera"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="transport"><i class="fa-solid fa-plane"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="activity"><i class="fa-solid fa-person-hiking"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="shopping"><i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
+                        <div class="resource-picker-list"></div>
+                    </div>
+                    <input type="hidden" id="activityLinkedResource" value="" />
                 </div>
                 <div class="form-row">
                     <div class="form-group flex-1">
@@ -447,9 +461,23 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>Link a saved resource (optional)</label>
-                    <select id="reservationLinkedResource" class="linked-resource-select">
-                        <option value="">— None —</option>
-                    </select>
+                    <div class="resource-picker" id="reservationResourcePicker">
+                        <div class="resource-picker-input-row">
+                            <input type="text" class="resource-picker-search" placeholder="Search resources..." autocomplete="off" />
+                            <button type="button" class="resource-picker-clear" title="Clear" style="display:none"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="resource-picker-filters">
+                            <button type="button" class="rpf-btn active" data-cat="all">All</button>
+                            <button type="button" class="rpf-btn" data-cat="restaurant"><i class="fa-solid fa-utensils"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="hotel"><i class="fa-solid fa-bed"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="sightseeing"><i class="fa-solid fa-camera"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="transport"><i class="fa-solid fa-plane"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="activity"><i class="fa-solid fa-person-hiking"></i></button>
+                            <button type="button" class="rpf-btn" data-cat="shopping"><i class="fa-solid fa-bag-shopping"></i></button>
+                        </div>
+                        <div class="resource-picker-list"></div>
+                    </div>
+                    <input type="hidden" id="reservationLinkedResource" value="" />
                 </div>
                 <div class="form-row">
                     <div class="form-group">
