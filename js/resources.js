@@ -411,8 +411,14 @@ const Resources = (() => {
         Storage.saveTrip(currentTrip);
         document.getElementById('resourceModal').classList.remove('open');
         editingIdx = null;
+
+        // Propagate changes to linked activities, reservations, endpoints
+        syncFromResources();
+
         render();
         App.updateStats();
+        Itinerary.render();
+        App.renderReservations();
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
 
         // Resolve city in background if missing
@@ -426,6 +432,59 @@ const Resources = (() => {
                 }
             });
         }
+    }
+
+    function syncFromResources() {
+        if (!currentTrip) return;
+        const resources = currentTrip.resources || [];
+        let changed = false;
+
+        // Sync activities linked to resources
+        (currentTrip.days || []).forEach(day => {
+            (day.activities || []).forEach(act => {
+                if (!act.linkedResourceId) return;
+                const res = resources.find(r => r.id === act.linkedResourceId);
+                if (!res) return;
+                if (res.title && act.title !== res.title) { act.title = res.title; changed = true; }
+                if (res.lat && act.lat !== res.lat) { act.lat = res.lat; changed = true; }
+                if (res.lng && act.lng !== res.lng) { act.lng = res.lng; changed = true; }
+                if (res.notes && act.address !== res.notes) { act.address = res.notes; changed = true; }
+                if (res.url && act.link !== res.url) { act.link = res.url; changed = true; }
+            });
+
+            // Sync lodging endpoints
+            ['lodgingDeparture', 'lodgingReturn'].forEach(key => {
+                const ep = day[key];
+                if (!ep || !ep.resourceId) return;
+                const res = resources.find(r => r.id === ep.resourceId);
+                if (!res) return;
+                if (res.lat && ep.lat !== res.lat) { ep.lat = res.lat; changed = true; }
+                if (res.lng && ep.lng !== res.lng) { ep.lng = res.lng; changed = true; }
+            });
+        });
+
+        // Sync reservations linked to resources
+        (currentTrip.reservations || []).forEach(rev => {
+            if (!rev.linkedResourceId) return;
+            const res = resources.find(r => r.id === rev.linkedResourceId);
+            if (!res) return;
+            if (res.title && rev.title !== res.title) { rev.title = res.title; changed = true; }
+        });
+
+        // Also sync lodging endpoint titles from their reservations
+        (currentTrip.days || []).forEach(day => {
+            ['lodgingDeparture', 'lodgingReturn'].forEach(key => {
+                const ep = day[key];
+                if (!ep || ep.reservationIdx === undefined) return;
+                const rev = currentTrip.reservations[ep.reservationIdx];
+                if (rev && ep.title !== rev.title) { ep.title = rev.title; changed = true; }
+            });
+        });
+
+        if (changed) {
+            Storage.saveTrip(currentTrip);
+        }
+        return changed;
     }
 
     function deleteResource(idx) {
@@ -568,5 +627,6 @@ const Resources = (() => {
         fetchAndApplyDetails,
         toggleStatus,
         resolveMissingCities,
+        syncFromResources,
     };
 })();

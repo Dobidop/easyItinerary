@@ -419,7 +419,12 @@ const MapModule = (() => {
             ];
             endpoints.forEach(({ data, label, icon }) => {
                 if (!data || !data.lat || !data.lng) return;
-                const title = escapeHtml(data.title || 'Hotel');
+                // Read title fresh from reservation
+                let rawTitle = data.title || 'Hotel';
+                if (data.reservationIdx !== undefined && trip.reservations && trip.reservations[data.reservationIdx]) {
+                    rawTitle = trip.reservations[data.reservationIdx].title || rawTitle;
+                }
+                const title = escapeHtml(rawTitle);
                 const timeStr = data.time ? `<p><i class="fa-regular fa-clock"></i> ${data.time}</p>` : '';
                 const popup = `
                     <h4><i class="fa-solid ${icon}"></i> ${label}</h4>

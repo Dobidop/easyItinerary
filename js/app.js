@@ -764,6 +764,7 @@ const App = (() => {
         switchSection,
         openReservationModal,
         deleteReservation,
+        renderReservations,
         toggleChecklistItem,
         deleteChecklistItem,
     };

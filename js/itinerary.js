@@ -551,7 +551,11 @@ const Itinerary = (() => {
 
     function buildEndpointHtml(endpoint, type) {
         if (!endpoint) return '';
-        const title = endpoint.title || 'Hotel';
+        // Always read title fresh from the reservation (source of truth)
+        let title = endpoint.title || 'Hotel';
+        if (endpoint.reservationIdx !== undefined && currentTrip.reservations[endpoint.reservationIdx]) {
+            title = currentTrip.reservations[endpoint.reservationIdx].title || title;
+        }
         const icon = type === 'departure' ? 'fa-right-from-bracket' : 'fa-right-to-bracket';
         const label = type === 'departure' ? 'Depart' : 'Return';
         const markerKey = endpoint.resourceId ? `res-${endpoint.resourceId}` : '';
