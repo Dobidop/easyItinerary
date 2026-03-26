@@ -434,7 +434,7 @@ const Resources = (() => {
                 : `<button title="Move to potentials" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-regular fa-lightbulb"></i></button>`;
 
             return `
-                <div class="resource-card ${isPotential ? 'potential' : ''}">
+                <div class="resource-card ${isPotential ? 'potential' : ''}" data-marker-key="${res.id ? 'res-' + res.id : ''}">
                     <div class="resource-icon ${res.category}">
                         <i class="fa-solid ${iconClass}"></i>
                     </div>
@@ -454,6 +454,17 @@ const Resources = (() => {
                 </div>
             `;
         }).join('');
+
+        // Wire hover-to-highlight for resource cards
+        container.querySelectorAll('.resource-card[data-marker-key]').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                const key = card.dataset.markerKey;
+                if (key) MapModule.highlightMarker(key);
+            });
+            card.addEventListener('mouseleave', () => {
+                MapModule.clearHighlight();
+            });
+        });
     }
 
     function copyUrl(url) {

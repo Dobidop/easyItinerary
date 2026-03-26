@@ -323,7 +323,7 @@ const Itinerary = (() => {
                 else if (isCheckOut && res.checkOutTime) label = `Check-out ${res.checkOutTime}`;
                 else if (isCheckOut) label = 'Check-out';
                 return `
-                    <div class="lodging-banner">
+                    <div class="lodging-banner"${res.linkedResourceId ? ` data-marker-key="res-${res.linkedResourceId}"` : ''}>
                         <i class="fa-solid fa-bed"></i>
                         <div class="lodging-banner-info">
                             <span class="lodging-banner-title">${escapeHtml(res.title)}</span>
@@ -339,7 +339,7 @@ const Itinerary = (() => {
                 const num = activityCounter++;
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
                 return `
-                    <div class="activity-card" draggable="true" data-day="${dayIdx}" data-act="${actIdx}">
+                    <div class="activity-card" draggable="true" data-day="${dayIdx}" data-act="${actIdx}" data-marker-key="act-${dayIdx}-${actIdx}">
                         ${act.startTime ? `<span class="activity-time-label">${act.startTime}</span>` : ''}
                         <div class="activity-marker ${act.category}"><i class="fa-solid ${getCategoryIcon(act.category)}"></i></div>
                         <div class="activity-top-row">
@@ -396,6 +396,20 @@ const Itinerary = (() => {
 
         updateDayFilter();
         setupDragAndDrop();
+
+        // Lodging banner hover + click to highlight/focus marker
+        document.querySelectorAll('.lodging-banner[data-marker-key]').forEach(banner => {
+            banner.style.cursor = 'pointer';
+            banner.addEventListener('mouseenter', () => {
+                MapModule.highlightMarker(banner.dataset.markerKey);
+            });
+            banner.addEventListener('mouseleave', () => {
+                MapModule.clearHighlight();
+            });
+            banner.addEventListener('click', () => {
+                MapModule.focusMarker(banner.dataset.markerKey);
+            });
+        });
     }
 
     function toggleDay(dayIdx) {
@@ -424,6 +438,21 @@ const Itinerary = (() => {
 
     function setupDragAndDrop() {
         document.querySelectorAll('.activity-card[draggable]').forEach(card => {
+            // Hover-to-highlight marker on map
+            card.addEventListener('mouseenter', () => {
+                const key = card.dataset.markerKey;
+                if (key) MapModule.highlightMarker(key);
+            });
+            card.addEventListener('mouseleave', () => {
+                MapModule.clearHighlight();
+            });
+            // Click to zoom into marker (ignore clicks on action buttons)
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.activity-actions')) return;
+                const key = card.dataset.markerKey;
+                if (key) MapModule.focusMarker(key);
+            });
+
             card.addEventListener('dragstart', (e) => {
                 dragState = {
                     dayIdx: parseInt(card.dataset.day),

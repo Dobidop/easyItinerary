@@ -10,6 +10,9 @@ const MapModule = (() => {
     let routeLine = null;
     let routeEnabled = false;
     let showPotentials = false;
+    let markerLookup = {};  // key → Leaflet marker, for hover highlighting
+    let highlightedKey = null;
+    let hoverPanTimer = null;
 
     const tileSets = {
         dark: {
@@ -364,15 +367,18 @@ const MapModule = (() => {
     function clearMarkers() {
         markers.forEach(m => map.removeLayer(m));
         markers = [];
+        markerLookup = {};
+        highlightedKey = null;
     }
 
-    function addMarker(lat, lng, popupHtml, category, number, opacity) {
+    function addMarker(lat, lng, popupHtml, category, number, opacity, key) {
         const icon = createMarkerIcon(category || 'other', number);
         const marker = L.marker([lat, lng], { icon, opacity: opacity ?? 1 }).addTo(map);
         if (popupHtml) {
-            marker.bindPopup(popupHtml, { maxWidth: 250 });
+            marker.bindPopup(popupHtml, { maxWidth: 250, autoPan: false });
         }
         markers.push(marker);
+        if (key) markerLookup[key] = marker;
         return marker;
     }
 
@@ -385,7 +391,7 @@ const MapModule = (() => {
         let activityNum = 1;
         trip.days.forEach((day, dayIdx) => {
             if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
-            day.activities.forEach((act) => {
+            day.activities.forEach((act, actIdx) => {
                 if (act.lat && act.lng) {
                     const timeStr = act.startTime ? `<p><i class="fa-regular fa-clock"></i> ${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}</p>` : '';
                     const linkStr = act.link ? `<p><a href="${escapeHtml(act.link)}" target="_blank">Open link</a></p>` : '';
@@ -398,7 +404,7 @@ const MapModule = (() => {
                         ${act.address ? `<p><i class="fa-solid fa-location-dot"></i> ${escapeHtml(act.address)}</p>` : ''}
                         ${linkStr}
                     `;
-                    addMarker(act.lat, act.lng, popup, act.category, activityNum);
+                    addMarker(act.lat, act.lng, popup, act.category, activityNum, undefined, `act-${dayIdx}-${actIdx}`);
                     activityNum++;
                 }
             });
@@ -417,7 +423,7 @@ const MapModule = (() => {
                         ${res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.url)}</a></p>` : ''}
                         ${res.notes ? `<p>${escapeHtml(res.notes)}</p>` : ''}
                     `;
-                    addMarker(res.lat, res.lng, popup, res.category, null, isPotential ? 0.45 : undefined);
+                    addMarker(res.lat, res.lng, popup, res.category, null, isPotential ? 0.45 : undefined, `res-${res.id}`);
                 }
             });
         }
@@ -569,6 +575,49 @@ const MapModule = (() => {
         return div.innerHTML;
     }
 
+    function highlightMarker(key) {
+        clearHighlight();
+        const marker = markerLookup[key];
+        if (!marker) return;
+        highlightedKey = key;
+        const el = marker.getElement();
+        if (el) el.classList.add('marker-highlight');
+        marker.openPopup();
+        // Pan into view after a short delay to avoid jumpy behavior
+        clearTimeout(hoverPanTimer);
+        const latlng = marker.getLatLng();
+        hoverPanTimer = setTimeout(() => {
+            if (highlightedKey === key && !map.getBounds().contains(latlng)) {
+                map.panTo(latlng);
+            }
+        }, 500);
+    }
+
+    function focusMarker(key) {
+        const marker = markerLookup[key];
+        if (!marker) return;
+        clearHighlight();
+        highlightedKey = key;
+        const el = marker.getElement();
+        if (el) el.classList.add('marker-highlight');
+        const latlng = marker.getLatLng();
+        map.setView(latlng, Math.max(map.getZoom(), 15), { animate: true });
+        marker.openPopup();
+    }
+
+    function clearHighlight() {
+        clearTimeout(hoverPanTimer);
+        if (highlightedKey) {
+            const prev = markerLookup[highlightedKey];
+            if (prev) {
+                const el = prev.getElement();
+                if (el) el.classList.remove('marker-highlight');
+                prev.closePopup();
+            }
+            highlightedKey = null;
+        }
+    }
+
     return {
         init,
         updateMarkers,
@@ -583,5 +632,8 @@ const MapModule = (() => {
         getMap,
         toggleRoute,
         togglePotentials,
+        highlightMarker,
+        clearHighlight,
+        focusMarker,
     };
 })();
