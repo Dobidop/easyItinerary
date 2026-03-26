@@ -9,6 +9,7 @@ const MapModule = (() => {
     let currentTileLayer = null;
     let routeLine = null;
     let routeEnabled = false;
+    let showPotentials = false;
 
     const tileSets = {
         dark: {
@@ -365,9 +366,9 @@ const MapModule = (() => {
         markers = [];
     }
 
-    function addMarker(lat, lng, popupHtml, category, number) {
+    function addMarker(lat, lng, popupHtml, category, number, opacity) {
         const icon = createMarkerIcon(category || 'other', number);
-        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        const marker = L.marker([lat, lng], { icon, opacity: opacity ?? 1 }).addTo(map);
         if (popupHtml) {
             marker.bindPopup(popupHtml, { maxWidth: 250 });
         }
@@ -403,16 +404,20 @@ const MapModule = (() => {
             });
         });
 
-        // Add resource markers (only when showing all days, or always but dimmed)
+        // Add resource markers (only when showing all days)
         if (dayFilter === 'all') {
             trip.resources.forEach((res) => {
+                const isPotential = res.status === 'potential';
+                if (isPotential && !showPotentials) return;
                 if (res.lat && res.lng) {
+                    const statusLabel = isPotential ? '<p style="font-size:11px;color:var(--text-muted);font-style:italic">Potential</p>' : '';
                     const popup = `
                         <h4>${escapeHtml(res.title)}</h4>
+                        ${statusLabel}
                         ${res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.url)}</a></p>` : ''}
                         ${res.notes ? `<p>${escapeHtml(res.notes)}</p>` : ''}
                     `;
-                    addMarker(res.lat, res.lng, popup, res.category);
+                    addMarker(res.lat, res.lng, popup, res.category, null, isPotential ? 0.45 : undefined);
                 }
             });
         }
@@ -529,6 +534,15 @@ const MapModule = (() => {
         }
     }
 
+    function togglePotentials() {
+        showPotentials = !showPotentials;
+        const btn = document.getElementById('btnTogglePotentials');
+        btn.classList.toggle('active', showPotentials);
+        const filter = document.getElementById('mapDayFilter').value;
+        const trip = getCurrentTrip();
+        if (trip) updateMarkers(trip, filter);
+    }
+
     function getCurrentTrip() {
         // Get from Storage since we don't store trip ref in MapModule
         return Storage.getActiveTrip();
@@ -568,5 +582,6 @@ const MapModule = (() => {
         setTileLayer,
         getMap,
         toggleRoute,
+        togglePotentials,
     };
 })();

@@ -193,6 +193,10 @@
                         <h2>Links & Resources</h2>
                         <button class="btn btn-sm btn-add" id="btnAddResource"><i class="fa-solid fa-plus"></i> Add Link</button>
                     </div>
+                    <div class="resource-status-tabs">
+                        <button class="status-tab active" data-status="selected"><i class="fa-solid fa-check-circle"></i> Selected</button>
+                        <button class="status-tab" data-status="potential"><i class="fa-regular fa-lightbulb"></i> Potentials</button>
+                    </div>
                     <div class="resource-filters">
                         <button class="filter-btn active" data-filter="all">All</button>
                         <button class="filter-btn" data-filter="restaurant"><i class="fa-solid fa-utensils"></i> Restaurants</button>
@@ -224,6 +228,7 @@
                     <option value="all">All Days</option>
                 </select>
                 <button class="btn btn-sm" id="btnToggleRoute" title="Show route"><i class="fa-solid fa-route"></i></button>
+                <button class="btn btn-sm" id="btnTogglePotentials" title="Show potentials on map"><i class="fa-regular fa-lightbulb"></i></button>
                 <button class="btn btn-sm" id="btnFitMap" title="Fit all markers"><i class="fa-solid fa-expand"></i></button>
                 <button class="btn btn-sm" id="btnTogglePanel" title="Toggle panel"><i class="fa-solid fa-angles-left"></i></button>
             </div>

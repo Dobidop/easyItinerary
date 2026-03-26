@@ -128,6 +128,9 @@ const App = (() => {
         document.getElementById('btnToggleRoute').addEventListener('click', () => {
             MapModule.toggleRoute();
         });
+        document.getElementById('btnTogglePotentials').addEventListener('click', () => {
+            MapModule.togglePotentials();
+        });
 
         // Fit map button
         document.getElementById('btnFitMap').addEventListener('click', () => {
@@ -808,7 +811,7 @@ const ResourcePicker = (() => {
             const resources = trip?.resources || [];
             const query = searchInput.value.toLowerCase().trim();
 
-            let filtered = resources;
+            let filtered = resources.filter(r => (r.status || 'selected') === 'selected');
             if (activeFilter !== 'all') {
                 filtered = filtered.filter(r => r.category === activeFilter);
             }

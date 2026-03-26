@@ -3,6 +3,7 @@ const Resources = (() => {
     let currentTrip = null;
     let editingIdx = null;
     let activeFilter = 'all';
+    let activeStatus = 'selected';
 
     const categoryIcons = {
         restaurant: 'fa-utensils',
@@ -58,6 +59,15 @@ const Resources = (() => {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 activeFilter = btn.dataset.filter;
+                render();
+            });
+        });
+
+        document.querySelectorAll('.status-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeStatus = btn.dataset.status;
                 render();
             });
         });
@@ -320,6 +330,7 @@ const Resources = (() => {
             notes: document.getElementById('resourceNotes').value,
             lat,
             lng,
+            status: editingIdx !== null ? (currentTrip.resources[editingIdx].status || 'selected') : activeStatus,
         };
 
         // Merge in place details if we fetched them
@@ -361,39 +372,69 @@ const Resources = (() => {
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
     }
 
+    function toggleStatus(idx) {
+        const res = currentTrip.resources[idx];
+        if (!res) return;
+        res.status = (res.status || 'selected') === 'selected' ? 'potential' : 'selected';
+        Storage.saveTrip(currentTrip);
+        render();
+        MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
+    }
+
     function render() {
         const container = document.getElementById('resourcesList');
         let resources = currentTrip.resources || [];
+
+        // Filter by status
+        resources = resources.filter(r => (r.status || 'selected') === activeStatus);
 
         if (activeFilter !== 'all') {
             resources = resources.filter(r => r.category === activeFilter);
         }
 
+        // Update tab counts
+        const allResources = currentTrip.resources || [];
+        const selectedCount = allResources.filter(r => (r.status || 'selected') === 'selected').length;
+        const potentialCount = allResources.filter(r => r.status === 'potential').length;
+        document.querySelectorAll('.status-tab').forEach(tab => {
+            const count = tab.dataset.status === 'selected' ? selectedCount : potentialCount;
+            const label = tab.dataset.status === 'selected' ? 'Selected' : 'Potentials';
+            const icon = tab.dataset.status === 'selected' ? '<i class="fa-solid fa-check-circle"></i>' : '<i class="fa-regular fa-lightbulb"></i>';
+            tab.innerHTML = `${icon} ${label} <span class="status-count">${count}</span>`;
+        });
+
         if (resources.length === 0) {
+            const emptyMsg = activeStatus === 'potential'
+                ? 'No potential resources yet. Add places you\'re considering.'
+                : (activeFilter === 'all' ? 'No selected resources yet.' : 'No selected resources in this category.');
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-bookmark"></i>
-                    <p>${activeFilter === 'all' ? 'No links saved yet. Save restaurants, hotels, and more.' : 'No links in this category.'}</p>
-                    ${activeFilter === 'all' ? '<button class="btn btn-small" onclick="Resources.openModal(null)"><i class="fa-solid fa-plus"></i> Add Link</button>' : ''}
+                    <p>${emptyMsg}</p>
+                    <button class="btn btn-small" onclick="Resources.openModal(null)"><i class="fa-solid fa-plus"></i> Add Link</button>
                 </div>
             `;
             return;
         }
 
+        const isPotential = activeStatus === 'potential';
         container.innerHTML = resources.map((res) => {
             const realIdx = currentTrip.resources.indexOf(res);
             const iconClass = categoryIcons[res.category] || 'fa-link';
             let urlDisplay = '';
             try { urlDisplay = res.url ? new URL(res.url).hostname : ''; } catch(e) { urlDisplay = res.url || ''; }
-            // Build detail tags
             const detailTags = [];
             if (res.cuisine) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-utensils"></i> ${escapeHtml(res.cuisine)}</span>`);
             if (res.openingHours) detailTags.push(`<span class="resource-detail"><i class="fa-regular fa-clock"></i> ${escapeHtml(res.openingHours)}</span>`);
             if (res.phone) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-phone"></i> ${escapeHtml(res.phone)}</span>`);
             if (res.stars) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-star"></i> ${escapeHtml(res.stars)} stars</span>`);
 
+            const statusBtn = isPotential
+                ? `<button title="Promote to selected" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-solid fa-check-circle"></i></button>`
+                : `<button title="Move to potentials" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-regular fa-lightbulb"></i></button>`;
+
             return `
-                <div class="resource-card">
+                <div class="resource-card ${isPotential ? 'potential' : ''}">
                     <div class="resource-icon ${res.category}">
                         <i class="fa-solid ${iconClass}"></i>
                     </div>
@@ -404,6 +445,7 @@ const Resources = (() => {
                         ${res.notes ? `<div class="resource-notes">${escapeHtml(res.notes)}</div>` : ''}
                     </div>
                     <div class="resource-actions">
+                        ${statusBtn}
                         ${res.lat && res.lng ? `<button title="Show on map" onclick="MapModule.panTo(${res.lat}, ${res.lng}, 16)"><i class="fa-solid fa-map-location-dot"></i></button>` : ''}
                         ${res.url ? `<button title="Copy URL" onclick="Resources.copyUrl('${escapeHtml(res.url)}')"><i class="fa-solid fa-copy"></i></button>` : ''}
                         <button title="Edit" onclick="Resources.openModal(${realIdx})"><i class="fa-solid fa-pen"></i></button>
@@ -448,5 +490,6 @@ const Resources = (() => {
         deleteResource,
         copyUrl,
         fetchAndApplyDetails,
+        toggleStatus,
     };
 })();

@@ -1022,6 +1022,60 @@ body {
 .expense-actions button:hover { color: var(--danger); }
 
 /* ===== Resources ===== */
+/* Resource status tabs */
+.resource-status-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+}
+.status-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.status-tab:hover { color: var(--text-primary); }
+.status-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+.status-count {
+    font-size: 11px;
+    background: var(--bg-input);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-weight: 600;
+}
+.status-tab.active .status-count {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* Potential resource card */
+.resource-card.potential {
+    opacity: 0.65;
+    border-style: dashed;
+}
+.resource-card.potential:hover { opacity: 0.85; }
+
+#btnTogglePotentials.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
 .resource-filters {
     display: flex;
     flex-wrap: wrap;
