@@ -410,6 +410,27 @@ const MapModule = (() => {
             });
         });
 
+        // Add lodging endpoint markers (departure/return)
+        trip.days.forEach((day, dayIdx) => {
+            if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
+            const endpoints = [
+                { data: day.lodgingDeparture, label: 'Depart', icon: 'fa-right-from-bracket' },
+                { data: day.lodgingReturn, label: 'Return', icon: 'fa-right-to-bracket' },
+            ];
+            endpoints.forEach(({ data, label, icon }) => {
+                if (!data || !data.lat || !data.lng) return;
+                const title = escapeHtml(data.title || 'Hotel');
+                const timeStr = data.time ? `<p><i class="fa-regular fa-clock"></i> ${data.time}</p>` : '';
+                const popup = `
+                    <h4><i class="fa-solid ${icon}"></i> ${label}</h4>
+                    <p>${title}</p>
+                    ${timeStr}
+                `;
+                const key = data.resourceId ? `res-${data.resourceId}` : null;
+                addMarker(data.lat, data.lng, popup, 'lodging', null, undefined, key);
+            });
+        });
+
         // Add resource markers (only when showing all days)
         if (dayFilter === 'all') {
             trip.resources.forEach((res) => {
@@ -469,11 +490,19 @@ const MapModule = (() => {
         const points = [];
         trip.days.forEach((day, dayIdx) => {
             if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
+            // Departure point at start of day
+            if (day.lodgingDeparture && day.lodgingDeparture.lat && day.lodgingDeparture.lng) {
+                points.push([day.lodgingDeparture.lat, day.lodgingDeparture.lng]);
+            }
             day.activities.forEach(act => {
                 if (act.lat && act.lng) {
                     points.push([act.lat, act.lng]);
                 }
             });
+            // Return point at end of day
+            if (day.lodgingReturn && day.lodgingReturn.lat && day.lodgingReturn.lng) {
+                points.push([day.lodgingReturn.lat, day.lodgingReturn.lng]);
+            }
         });
 
         if (points.length < 2) return;

@@ -194,9 +194,13 @@ const Itinerary = (() => {
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
     }
 
-    function buildTimelineBar(activities) {
+    function buildTimelineBar(activities, dep, ret) {
         const timed = activities.filter(a => a.startTime);
-        if (timed.length === 0) return '';
+        // Include endpoints in timing
+        const endpointTimes = [];
+        if (dep && dep.time) endpointTimes.push(dep.time);
+        if (ret && ret.time) endpointTimes.push(ret.time);
+        if (timed.length === 0 && endpointTimes.length === 0) return '';
 
         // Find day range from earliest start to latest end
         const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -206,6 +210,11 @@ const Itinerary = (() => {
             const e = a.endTime ? toMin(a.endTime) : s + 30;
             if (s < earliest) earliest = s;
             if (e > latest) latest = e;
+        });
+        endpointTimes.forEach(t => {
+            const m = toMin(t);
+            if (m < earliest) earliest = m;
+            if (m > latest) latest = m;
         });
 
         // Snap to hour boundaries with padding
@@ -232,11 +241,23 @@ const Itinerary = (() => {
             return `<div class="tbar-block ${cat}" style="left:${left}%;width:${width}%" title="${escapeHtml(a.title)}  ${a.startTime}${a.endTime ? '–' + a.endTime : ''}"></div>`;
         }).join('');
 
+        // Endpoint markers on timeline
+        let endpointMarkers = '';
+        if (dep && dep.time) {
+            const pct = ((toMin(dep.time) - earliest) / span) * 100;
+            endpointMarkers += `<div class="tbar-endpoint departure" style="left:${pct}%" title="Depart ${dep.time}"></div>`;
+        }
+        if (ret && ret.time) {
+            const pct = ((toMin(ret.time) - earliest) / span) * 100;
+            endpointMarkers += `<div class="tbar-endpoint return" style="left:${pct}%" title="Return ${ret.time}"></div>`;
+        }
+
         return `
             <div class="timeline-bar">
                 <div class="tbar-track">
                     ${hours.join('')}
                     ${blocks}
+                    ${endpointMarkers}
                 </div>
             </div>
         `;
@@ -313,7 +334,12 @@ const Itinerary = (() => {
             const actCount = day.activities.length;
 
             // Find lodging reservations that span this day
-            const lodgingHtml = getLodgingForDay(day.date).map(res => {
+            const lodgings = getLodgingForDay(day.date);
+            const dep = day.lodgingDeparture || null;
+            const ret = day.lodgingReturn || null;
+
+            const lodgingHtml = lodgings.map(res => {
+                const resIdx = currentTrip.reservations.indexOf(res);
                 const nights = (res.checkIn && res.checkOut) ? Math.ceil((new Date(res.checkOut) - new Date(res.checkIn)) / (1000*60*60*24)) : 0;
                 const isCheckIn = res.checkIn === day.date;
                 const isCheckOut = res.checkOut === day.date;
@@ -323,6 +349,8 @@ const Itinerary = (() => {
                 else if (isCheckOut && res.checkOutTime) label = `Check-out ${res.checkOutTime}`;
                 else if (isCheckOut) label = 'Check-out';
                 const lodgingCity = getLodgingCity(res);
+                const isDep = dep && dep.reservationIdx === resIdx;
+                const isRet = ret && ret.reservationIdx === resIdx;
                 return `
                     <div class="lodging-banner"${res.linkedResourceId ? ` data-marker-key="res-${res.linkedResourceId}"` : ''}>
                         <i class="fa-solid fa-bed"></i>
@@ -332,6 +360,12 @@ const Itinerary = (() => {
                             ${res.provider ? `<span class="lodging-banner-provider">${escapeHtml(res.provider)}</span>` : ''}
                         </div>
                         ${nights > 0 ? `<span class="lodging-banner-nights">${nights}n</span>` : ''}
+                        <div class="lodging-day-actions">
+                            <button class="lodging-toggle ${isDep ? 'active' : ''}" title="Depart from here" onclick="event.stopPropagation(); Itinerary.setLodgingEndpoint(${dayIdx}, ${resIdx}, 'departure')"><i class="fa-solid fa-right-from-bracket"></i></button>
+                            ${isDep ? `<input type="time" class="lodging-time-input" value="${dep.time || ''}" title="Departure time" onchange="Itinerary.setLodgingTime(${dayIdx}, 'departure', this.value)" onclick="event.stopPropagation()" />` : ''}
+                            <button class="lodging-toggle ${isRet ? 'active' : ''}" title="Return here" onclick="event.stopPropagation(); Itinerary.setLodgingEndpoint(${dayIdx}, ${resIdx}, 'return')"><i class="fa-solid fa-right-to-bracket"></i></button>
+                            ${isRet ? `<input type="time" class="lodging-time-input" value="${ret.time || ''}" title="Return time" onchange="Itinerary.setLodgingTime(${dayIdx}, 'return', this.value)" onclick="event.stopPropagation()" />` : ''}
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -386,9 +420,11 @@ const Itinerary = (() => {
                     </div>
                     <div class="day-body">
                         ${lodgingHtml}
-                        ${buildTimelineBar(day.activities)}
+                        ${buildTimelineBar(day.activities, dep, ret)}
                         <div class="activity-timeline" data-day="${dayIdx}">
+                            ${buildEndpointHtml(dep, 'departure')}
                             ${activitiesHtml}
+                            ${buildEndpointHtml(ret, 'return')}
                         </div>
                         <button class="add-activity-btn" onclick="Itinerary.openActivityModal(${dayIdx}, null)">
                             <i class="fa-solid fa-plus"></i> Add activity
@@ -401,17 +437,18 @@ const Itinerary = (() => {
         updateDayFilter();
         setupDragAndDrop();
 
-        // Lodging banner hover + click to highlight/focus marker
-        document.querySelectorAll('.lodging-banner[data-marker-key]').forEach(banner => {
-            banner.style.cursor = 'pointer';
-            banner.addEventListener('mouseenter', () => {
-                MapModule.highlightMarker(banner.dataset.markerKey);
+        // Lodging banner + endpoint hover/click to highlight/focus marker
+        document.querySelectorAll('.lodging-banner[data-marker-key], .lodging-endpoint[data-marker-key]').forEach(el => {
+            el.style.cursor = 'pointer';
+            el.addEventListener('mouseenter', () => {
+                MapModule.highlightMarker(el.dataset.markerKey);
             });
-            banner.addEventListener('mouseleave', () => {
+            el.addEventListener('mouseleave', () => {
                 MapModule.clearHighlight();
             });
-            banner.addEventListener('click', () => {
-                MapModule.focusMarker(banner.dataset.markerKey);
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.lodging-day-actions')) return;
+                MapModule.focusMarker(el.dataset.markerKey);
             });
         });
     }
@@ -512,6 +549,70 @@ const Itinerary = (() => {
         });
     }
 
+    function buildEndpointHtml(endpoint, type) {
+        if (!endpoint) return '';
+        const title = endpoint.title || 'Hotel';
+        const icon = type === 'departure' ? 'fa-right-from-bracket' : 'fa-right-to-bracket';
+        const label = type === 'departure' ? 'Depart' : 'Return';
+        const markerKey = endpoint.resourceId ? `res-${endpoint.resourceId}` : '';
+        return `
+            <div class="lodging-endpoint ${type}"${markerKey ? ` data-marker-key="${markerKey}"` : ''}>
+                <div class="endpoint-marker lodging"><i class="fa-solid ${icon}"></i></div>
+                <div class="endpoint-info">
+                    <span class="endpoint-label">${label}</span>
+                    <span class="endpoint-title">${escapeHtml(title)}</span>
+                    ${endpoint.time ? `<span class="endpoint-time">${endpoint.time}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    function setLodgingEndpoint(dayIdx, reservationIdx, type) {
+        const day = currentTrip.days[dayIdx];
+        const key = type === 'departure' ? 'lodgingDeparture' : 'lodgingReturn';
+        if (day[key] && day[key].reservationIdx === reservationIdx) {
+            // Toggle off
+            delete day[key];
+        } else {
+            const reservation = currentTrip.reservations[reservationIdx];
+            const endpoint = { reservationIdx, time: '' };
+            if (reservation) {
+                endpoint.title = reservation.title;
+                let resource = null;
+                // Try linked resource first
+                if (reservation.linkedResourceId) {
+                    resource = (currentTrip.resources || []).find(r => r.id === reservation.linkedResourceId);
+                }
+                // Fallback: find resource by matching title
+                if (!resource || !resource.lat) {
+                    resource = (currentTrip.resources || []).find(r =>
+                        r.lat && r.lng && r.title && reservation.title &&
+                        (r.title.includes(reservation.title) || reservation.title.includes(r.title))
+                    );
+                }
+                if (resource && resource.lat && resource.lng) {
+                    endpoint.lat = resource.lat;
+                    endpoint.lng = resource.lng;
+                    endpoint.resourceId = resource.id;
+                }
+            }
+            day[key] = endpoint;
+        }
+        Storage.saveTrip(currentTrip);
+        render();
+        MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
+    }
+
+    function setLodgingTime(dayIdx, type, time) {
+        const day = currentTrip.days[dayIdx];
+        const key = type === 'departure' ? 'lodgingDeparture' : 'lodgingReturn';
+        if (day[key]) {
+            day[key].time = time;
+            Storage.saveTrip(currentTrip);
+            render();
+        }
+    }
+
     function getLodgingCity(res) {
         if (res.linkedResourceId && currentTrip.resources) {
             const linked = currentTrip.resources.find(r => r.id === res.linkedResourceId);
@@ -564,5 +665,7 @@ const Itinerary = (() => {
         toggleDay,
         showOnMap,
         filterMapToDay,
+        setLodgingEndpoint,
+        setLodgingTime,
     };
 })();

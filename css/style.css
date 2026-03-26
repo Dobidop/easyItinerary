@@ -812,6 +812,110 @@ body {
 .lodging-banner-provider { font-size: 12px; color: var(--text-muted); }
 .lodging-banner-nights { font-size: 11px; font-weight: 600; color: var(--text-muted); flex-shrink: 0; }
 
+/* Lodging day actions (depart/return toggles) */
+.lodging-day-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.lodging-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 3px 6px;
+    font-size: 11px;
+    transition: all 0.15s;
+}
+.lodging-toggle:hover { border-color: var(--cat-lodging); color: var(--cat-lodging); }
+.lodging-toggle.active {
+    background: rgba(52, 211, 153, 0.15);
+    border-color: var(--cat-lodging);
+    color: var(--cat-lodging);
+}
+.lodging-time-input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 11px;
+    padding: 2px 4px;
+    width: 70px;
+}
+
+/* Lodging endpoint entries in timeline */
+.lodging-endpoint {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(52, 211, 153, 0.06);
+    border: 1px dashed rgba(52, 211, 153, 0.3);
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+.lodging-endpoint:hover { border-color: var(--cat-lodging); }
+.lodging-endpoint.departure { border-left: 3px solid var(--cat-lodging); }
+.lodging-endpoint.return { border-left: 3px solid var(--cat-lodging); }
+.endpoint-marker {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #fff;
+    flex-shrink: 0;
+}
+.endpoint-marker.lodging { background: var(--cat-lodging); }
+.endpoint-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+.endpoint-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--cat-lodging);
+    letter-spacing: 0.5px;
+}
+.endpoint-title {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.endpoint-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+/* Timeline bar endpoint markers */
+.tbar-endpoint {
+    position: absolute;
+    top: 4px;
+    width: 2px;
+    height: 26px;
+    background: var(--cat-lodging);
+    transform: translateX(-1px);
+    z-index: 3;
+}
+.tbar-endpoint::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cat-lodging);
+}
+
 .add-activity-btn {
     width: 100%;
     padding: 8px;
