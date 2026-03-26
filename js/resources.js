@@ -88,6 +88,7 @@ const Resources = (() => {
             document.getElementById('resourceNotes').value = res.notes || '';
             document.getElementById('resourceLat').value = res.lat || '';
             document.getElementById('resourceLng').value = res.lng || '';
+            document.getElementById('resourceCity').value = res.city || '';
         } else if (!skipClear) {
             document.getElementById('resourceTitle').value = '';
             document.getElementById('resourceUrl').value = '';
@@ -95,6 +96,7 @@ const Resources = (() => {
             document.getElementById('resourceNotes').value = '';
             document.getElementById('resourceLat').value = '';
             document.getElementById('resourceLng').value = '';
+            document.getElementById('resourceCity').value = '';
         }
         modal.classList.add('open');
     }
@@ -214,11 +216,45 @@ const Resources = (() => {
 
     /* ===== Reverse geocode via Nominatim ===== */
     function reverseGeocode(lat, lng) {
-        return fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-            headers: { 'Accept-Language': 'en' }
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 5000);
+        return fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, {
+            headers: { 'Accept-Language': 'en' },
+            signal: controller.signal,
         })
         .then(res => res.json())
         .catch(() => null);
+    }
+
+    /* ===== Resolve city from coordinates (fallback) ===== */
+    function resolveCityFromCoords(lat, lng) {
+        return reverseGeocode(lat, lng).then(data => {
+            if (!data || !data.address) return '';
+            const a = data.address;
+            return a.city || a.town || a.village || a.municipality || a.county || '';
+        });
+    }
+
+    function resolveMissingCities() {
+        if (!currentTrip || !currentTrip.resources) return;
+        const pending = currentTrip.resources.filter(r => r.lat && r.lng && !r.city);
+        if (pending.length === 0) return;
+        // Resolve sequentially with small delay to respect Nominatim rate limits
+        let i = 0;
+        function next() {
+            if (i >= pending.length) return;
+            const res = pending[i++];
+            resolveCityFromCoords(res.lat, res.lng).then(city => {
+                if (city) {
+                    res.city = city;
+                    Storage.saveTrip(currentTrip);
+                    render();
+                    Itinerary.render();
+                }
+                setTimeout(next, 1100); // Nominatim: max 1 req/s
+            });
+        }
+        next();
     }
 
     /* ===== Fetch place details from Overpass (OSM tags) ===== */
@@ -258,6 +294,7 @@ const Resources = (() => {
                 internetAccess: t.internet_access || '',
                 wheelchair: t.wheelchair || '',
                 osmType: t.tourism || t.amenity || t.shop || '',
+                city: t['addr:city'] || '',
             };
         })
         .catch(() => null);
@@ -276,6 +313,21 @@ const Resources = (() => {
         }
         if (details.address && !document.getElementById('resourceNotes').value.trim()) {
             document.getElementById('resourceNotes').value = details.address;
+        }
+        if (details.city && !document.getElementById('resourceCity').value.trim()) {
+            document.getElementById('resourceCity').value = details.city;
+        } else if (!details.city && !document.getElementById('resourceCity').value.trim()) {
+            // Fallback: reverse geocode to get city from coordinates
+            const lat = parseFloat(document.getElementById('resourceLat').value);
+            const lng = parseFloat(document.getElementById('resourceLng').value);
+            if (lat && lng) {
+                resolveCityFromCoords(lat, lng).then(city => {
+                    if (city && !document.getElementById('resourceCity').value.trim()) {
+                        document.getElementById('resourceCity').value = city;
+                        if (pendingDetails) pendingDetails.city = city;
+                    }
+                });
+            }
         }
         // Auto-detect category from OSM type
         if (document.getElementById('resourceCategory').value === 'general' && details.osmType) {
@@ -331,6 +383,7 @@ const Resources = (() => {
             lat,
             lng,
             status: editingIdx !== null ? (currentTrip.resources[editingIdx].status || 'selected') : activeStatus,
+            city: document.getElementById('resourceCity').value || (editingIdx !== null ? currentTrip.resources[editingIdx].city || '' : ''),
         };
 
         // Merge in place details if we fetched them
@@ -361,6 +414,18 @@ const Resources = (() => {
         render();
         App.updateStats();
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
+
+        // Resolve city in background if missing
+        if (resource.lat && resource.lng && !resource.city) {
+            resolveCityFromCoords(resource.lat, resource.lng).then(city => {
+                if (city) {
+                    resource.city = city;
+                    Storage.saveTrip(currentTrip);
+                    render();
+                    Itinerary.render();
+                }
+            });
+        }
     }
 
     function deleteResource(idx) {
@@ -439,7 +504,7 @@ const Resources = (() => {
                         <i class="fa-solid ${iconClass}"></i>
                     </div>
                     <div class="resource-info">
-                        <h4>${res.url ? `<a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.title)}</a>` : escapeHtml(res.title)}</h4>
+                        <h4>${res.url ? `<a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.title)}</a>` : escapeHtml(res.title)}${res.city ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(res.city)}</span>` : ''}</h4>
                         ${res.url ? `<span class="resource-url">${escapeHtml(urlDisplay)}</span>` : ''}
                         ${detailTags.length ? `<div class="resource-details">${detailTags.join('')}</div>` : ''}
                         ${res.notes ? `<div class="resource-notes">${escapeHtml(res.notes)}</div>` : ''}
@@ -502,5 +567,6 @@ const Resources = (() => {
         copyUrl,
         fetchAndApplyDetails,
         toggleStatus,
+        resolveMissingCities,
     };
 })();

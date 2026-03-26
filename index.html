@@ -31,6 +31,7 @@
                     <button class="theme-option" data-theme="warm"><span class="theme-swatch warm"></span> Warm</button>
                 </div>
             </div>
+            <button class="btn btn-sm" id="btnToggleLocations" title="Show/hide location labels"><i class="fa-solid fa-location-dot"></i></button>
             <button class="btn btn-sm" id="btnShare" title="Share trip via link"><i class="fa-solid fa-share-nodes"></i> Share</button>
             <button class="btn btn-sm" id="btnExport" title="Export JSON"><i class="fa-solid fa-download"></i> Export</button>
             <button class="btn btn-sm" id="btnImport" title="Import JSON"><i class="fa-solid fa-upload"></i> Import</button>
@@ -447,6 +448,7 @@
                     <div class="form-group form-group-btn">
                         <button class="btn btn-sm" id="btnPickResourceLocation" title="Pick on map"><i class="fa-solid fa-map-pin"></i> Pick on Map</button>
                     </div>
+                    <input type="hidden" id="resourceCity" />
                 </div>
             </div>
             <div class="modal-footer">

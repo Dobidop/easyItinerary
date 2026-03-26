@@ -48,6 +48,9 @@ const App = (() => {
         updateStats();
         MapModule.updateMarkers(currentTrip, 'all');
 
+        // Resolve missing city labels in background
+        Resources.resolveMissingCities();
+
         // Auto-save on input changes in overview
         setupAutoSave();
     }
@@ -130,6 +133,17 @@ const App = (() => {
         });
         document.getElementById('btnTogglePotentials').addEventListener('click', () => {
             MapModule.togglePotentials();
+        });
+
+        // Toggle location labels
+        const showLoc = localStorage.getItem('easyitinerary-show-locations') !== 'false';
+        if (showLoc) document.body.classList.add('show-locations');
+        document.getElementById('btnToggleLocations').classList.toggle('active', showLoc);
+        document.getElementById('btnToggleLocations').addEventListener('click', () => {
+            document.body.classList.toggle('show-locations');
+            const on = document.body.classList.contains('show-locations');
+            document.getElementById('btnToggleLocations').classList.toggle('active', on);
+            localStorage.setItem('easyitinerary-show-locations', on);
         });
 
         // Fit map button
@@ -567,11 +581,12 @@ const App = (() => {
                 detailsHtml = [dateDisplay, timeDisplay].filter(Boolean).join('');
             }
 
+            const resCity = getReservationCity(res);
             return `
                 <div class="reservation-card">
                     <div class="reservation-icon ${t.class}"><i class="fa-solid ${t.icon}"></i></div>
                     <div class="reservation-info">
-                        <h4>${escapeHtml(res.title)}</h4>
+                        <h4>${escapeHtml(res.title)}${resCity ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(resCity)}</span>` : ''}</h4>
                         <div class="reservation-meta">
                             ${res.provider ? `<span>${escapeHtml(res.provider)}</span>` : ''}
                             ${detailsHtml}
@@ -723,6 +738,14 @@ const App = (() => {
     }
 
     // Format departure/arrival datetime-local values into a readable string
+    function getReservationCity(res) {
+        if (res.linkedResourceId && currentTrip.resources) {
+            const linked = currentTrip.resources.find(r => r.id === res.linkedResourceId);
+            if (linked && linked.city) return linked.city;
+        }
+        return '';
+    }
+
     function formatDepArr(dep, arr) {
         if (!dep && !arr) return '';
         const fmt = (dt) => {

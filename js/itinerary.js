@@ -322,11 +322,12 @@ const Itinerary = (() => {
                 else if (isCheckIn) label = 'Check-in';
                 else if (isCheckOut && res.checkOutTime) label = `Check-out ${res.checkOutTime}`;
                 else if (isCheckOut) label = 'Check-out';
+                const lodgingCity = getLodgingCity(res);
                 return `
                     <div class="lodging-banner"${res.linkedResourceId ? ` data-marker-key="res-${res.linkedResourceId}"` : ''}>
                         <i class="fa-solid fa-bed"></i>
                         <div class="lodging-banner-info">
-                            <span class="lodging-banner-title">${escapeHtml(res.title)}</span>
+                            <span class="lodging-banner-title">${escapeHtml(res.title)}${lodgingCity ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(lodgingCity)}</span>` : ''}</span>
                             ${label ? `<span class="lodging-banner-label">${label}</span>` : ''}
                             ${res.provider ? `<span class="lodging-banner-provider">${escapeHtml(res.provider)}</span>` : ''}
                         </div>
@@ -338,12 +339,14 @@ const Itinerary = (() => {
             const activitiesHtml = day.activities.map((act, actIdx) => {
                 const num = activityCounter++;
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
+                const city = getCity(act);
                 return `
                     <div class="activity-card" draggable="true" data-day="${dayIdx}" data-act="${actIdx}" data-marker-key="act-${dayIdx}-${actIdx}">
                         ${act.startTime ? `<span class="activity-time-label">${act.startTime}</span>` : ''}
                         <div class="activity-marker ${act.category}"><i class="fa-solid ${getCategoryIcon(act.category)}"></i></div>
                         <div class="activity-top-row">
                             <span class="activity-title">${escapeHtml(act.title)}</span>
+                            ${city ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(city)}</span>` : ''}
                             <span class="activity-time">${timeStr}</span>
                         </div>
                         <div class="activity-details">
@@ -499,6 +502,28 @@ const Itinerary = (() => {
                 MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
             });
         });
+    }
+
+    function getLodgingCity(res) {
+        if (res.linkedResourceId && currentTrip.resources) {
+            const linked = currentTrip.resources.find(r => r.id === res.linkedResourceId);
+            if (linked && linked.city) return linked.city;
+        }
+        return '';
+    }
+
+    function getCity(act) {
+        // Try linked resource first
+        if (act.linkedResourceId && currentTrip.resources) {
+            const res = currentTrip.resources.find(r => r.id === act.linkedResourceId);
+            if (res && res.city) return res.city;
+        }
+        // Fall back to extracting from address (last meaningful part)
+        if (act.address) {
+            const parts = act.address.split(',').map(p => p.trim()).filter(Boolean);
+            if (parts.length >= 2) return parts[parts.length - 2];
+        }
+        return '';
     }
 
     function getCurrencySymbol(code) {

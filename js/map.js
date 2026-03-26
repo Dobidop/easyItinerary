@@ -299,6 +299,7 @@ const MapModule = (() => {
         document.getElementById('resourceNotes').value = r.display_name;
         document.getElementById('resourceLat').value = parseFloat(r.lat).toFixed(6);
         document.getElementById('resourceLng').value = parseFloat(r.lon).toFixed(6);
+        document.getElementById('resourceCity').value = r.city || '';
 
         // Open modal and fetch place details
         Resources.openModal(null, true); // true = skip clearing fields
