@@ -380,6 +380,7 @@ const Itinerary = (() => {
                             </div>
                         </div>
                         <div class="day-header-actions">
+                            <button title="Show day on map" onclick="event.stopPropagation(); Itinerary.filterMapToDay(${dayIdx})"><i class="fa-solid fa-map"></i></button>
                             <button title="Delete day" onclick="event.stopPropagation(); Itinerary.removeDay(${dayIdx})"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>
@@ -422,6 +423,13 @@ const Itinerary = (() => {
 
     function showOnMap(lat, lng) {
         MapModule.panTo(lat, lng, 16);
+    }
+
+    function filterMapToDay(dayIdx) {
+        const select = document.getElementById('mapDayFilter');
+        // Toggle: if already filtering this day, go back to all
+        select.value = select.value === String(dayIdx) ? 'all' : String(dayIdx);
+        select.dispatchEvent(new Event('change'));
     }
 
     function updateDayFilter() {
@@ -555,5 +563,6 @@ const Itinerary = (() => {
         deleteActivity,
         toggleDay,
         showOnMap,
+        filterMapToDay,
     };
 })();
