@@ -579,7 +579,7 @@ const Resources = (() => {
             `;
         }).join('');
 
-        // Wire hover-to-highlight for resource cards
+        // Wire hover-to-highlight and click-to-focus for resource cards
         container.querySelectorAll('.resource-card[data-marker-key]').forEach(card => {
             card.addEventListener('mouseenter', () => {
                 const key = card.dataset.markerKey;
@@ -587,6 +587,11 @@ const Resources = (() => {
             });
             card.addEventListener('mouseleave', () => {
                 MapModule.clearHighlight();
+            });
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.resource-actions') || e.target.closest('a')) return;
+                const key = card.dataset.markerKey;
+                if (key) MapModule.focusMarker(key);
             });
         });
     }

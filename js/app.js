@@ -582,8 +582,9 @@ const App = (() => {
             }
 
             const resCity = getReservationCity(res);
+            const resMarkerKey = getReservationMarkerKey(res);
             return `
-                <div class="reservation-card">
+                <div class="reservation-card"${resMarkerKey ? ` data-marker-key="${resMarkerKey}"` : ''}>
                     <div class="reservation-icon ${t.class}"><i class="fa-solid ${t.icon}"></i></div>
                     <div class="reservation-info">
                         <h4>${escapeHtml(res.title)}${resCity ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(resCity)}</span>` : ''}</h4>
@@ -602,6 +603,20 @@ const App = (() => {
                 </div>
             `;
         }).join('');
+
+        // Wire hover + click-to-focus for reservation cards
+        container.querySelectorAll('.reservation-card[data-marker-key]').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                MapModule.highlightMarker(card.dataset.markerKey);
+            });
+            card.addEventListener('mouseleave', () => {
+                MapModule.clearHighlight();
+            });
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.reservation-actions') || e.target.closest('.reservation-confirmation')) return;
+                MapModule.focusMarker(card.dataset.markerKey);
+            });
+        });
     }
 
     // ===== Checklist =====
@@ -738,12 +753,34 @@ const App = (() => {
     }
 
     // Format departure/arrival datetime-local values into a readable string
-    function getReservationCity(res) {
-        if (res.linkedResourceId && currentTrip.resources) {
-            const linked = currentTrip.resources.find(r => r.id === res.linkedResourceId);
-            if (linked && linked.city) return linked.city;
+    function getReservationMarkerKey(res) {
+        const resources = currentTrip.resources || [];
+        let linked = null;
+        if (res.linkedResourceId) {
+            linked = resources.find(r => r.id === res.linkedResourceId);
         }
-        return '';
+        if (!linked || !linked.lat) {
+            linked = resources.find(r =>
+                r.lat && r.lng && r.title && res.title &&
+                (r.title.includes(res.title) || res.title.includes(r.title))
+            );
+        }
+        return linked ? `res-${linked.id}` : '';
+    }
+
+    function getReservationCity(res) {
+        const resources = currentTrip.resources || [];
+        let linked = null;
+        if (res.linkedResourceId) {
+            linked = resources.find(r => r.id === res.linkedResourceId);
+        }
+        if (!linked || !linked.city) {
+            linked = resources.find(r =>
+                r.city && r.title && res.title &&
+                (r.title.includes(res.title) || res.title.includes(r.title))
+            );
+        }
+        return linked && linked.city ? linked.city : '';
     }
 
     function formatDepArr(dep, arr) {
