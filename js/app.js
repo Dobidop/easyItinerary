@@ -151,11 +151,27 @@ const App = (() => {
             MapModule.fitBounds();
         });
 
-        // Toggle panel
+        // Toggle panel (desktop)
         document.getElementById('btnTogglePanel').addEventListener('click', () => {
             const panel = document.querySelector('.left-panel');
             panel.classList.toggle('collapsed');
             setTimeout(() => MapModule.invalidateSize(), 300);
+        });
+
+        // Mobile map toggle (3 states: default 35vh → minimized → expanded 70vh → default)
+        document.getElementById('mobileMapToggle').addEventListener('click', () => {
+            const mapPanel = document.querySelector('.right-panel');
+            const toggle = document.getElementById('mobileMapToggle');
+            if (mapPanel.classList.contains('map-minimized')) {
+                mapPanel.classList.remove('map-minimized');
+                toggle.classList.remove('flipped');
+                toggle.querySelector('span').textContent = 'Map';
+            } else {
+                mapPanel.classList.add('map-minimized');
+                toggle.classList.add('flipped');
+                toggle.querySelector('span').textContent = 'Show Map';
+            }
+            setTimeout(() => MapModule.invalidateSize(), 350);
         });
     }
 

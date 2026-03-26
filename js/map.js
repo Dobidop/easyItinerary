@@ -626,6 +626,23 @@ const MapModule = (() => {
     function focusMarker(key) {
         const marker = markerLookup[key];
         if (!marker) return;
+
+        // On mobile, expand map if minimized
+        const mapPanel = document.querySelector('.right-panel');
+        if (mapPanel && mapPanel.classList.contains('map-minimized')) {
+            mapPanel.classList.remove('map-minimized');
+            const toggle = document.getElementById('mobileMapToggle');
+            if (toggle) {
+                toggle.classList.remove('flipped');
+                toggle.querySelector('span').textContent = 'Map';
+            }
+            setTimeout(() => {
+                invalidateSize();
+                map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15), { animate: true });
+                marker.openPopup();
+            }, 350);
+        }
+
         clearHighlight();
         highlightedKey = key;
         const el = marker.getElement();

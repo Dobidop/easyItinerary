@@ -135,6 +135,7 @@ body {
     background: var(--bg-primary);
     color: var(--text-primary);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -1799,21 +1800,112 @@ body.show-locations .location-label {
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
+    /* Prevent horizontal overflow */
+    html, body { overflow-x: hidden; }
+
     .main-layout { flex-direction: column; }
     .left-panel {
         width: 100%;
         max-width: none;
         min-width: 0;
-        height: 60vh;
+        flex: 1 1 0;
+        min-height: 0;
+        height: auto;
         border-right: none;
-        border-bottom: 1px solid var(--border);
+        overflow-y: auto;
     }
-    .right-panel { height: 40vh; }
+    .right-panel {
+        height: 35dvh;
+        flex: 0 0 35dvh;
+        transition: height 0.3s ease, flex-basis 0.3s ease;
+        position: relative;
+    }
+    .right-panel.map-minimized {
+        height: 0;
+        flex: 0 0 0;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    /* Mobile map toggle */
+    .mobile-map-toggle {
+        display: flex !important;
+        padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Top bar mobile — icon-only buttons, no text overflow */
+    .top-bar { padding: 6px 8px; height: 44px; overflow: hidden; }
     .top-bar-center { display: none; }
-    .summary-cards { grid-template-columns: repeat(2, 1fr); }
-    .map-controls { top: 5px; left: 5px; right: 5px; }
-    .map-search-wrapper { max-width: 220px; }
+    .top-bar-left { flex-shrink: 0; }
+    .top-bar-right { gap: 3px; flex-shrink: 0; }
+    .top-bar-right .btn { padding: 5px 7px; font-size: 12px; }
+    /* Hide button text labels — keep only icons */
+    #btnShare, #btnExport, #btnImport { font-size: 0; }
+    #btnShare i, #btnExport i, #btnImport i { font-size: 12px; }
+    .logo { font-size: 14px; }
+    .logo i { margin-right: 4px; }
+    .save-status { display: none; }
+
+    /* Section tabs */
+    .section-tab { font-size: 11px; padding: 8px 4px; gap: 4px; }
+
+    /* Tighter card spacing */
+    .panel-content { padding: 10px; }
+    .day-card { margin-bottom: 12px; }
+    .activity-card { padding: 8px 10px; }
+    .activity-details { font-size: 12px; }
+    .activity-time-label { font-size: 10px; }
+
+    /* Lodging banner responsive */
+    .lodging-banner { flex-wrap: wrap; padding: 6px 10px; gap: 6px; }
+    .lodging-day-actions { gap: 3px; }
+    .lodging-time-input { width: 58px; font-size: 10px; }
+
+    /* Resource/reservation cards */
+    .resource-card { padding: 10px; }
+    .reservation-card { padding: 10px; }
+    .reservation-meta { font-size: 11px; }
+
+    /* Map controls — compact, no overflow */
+    .map-controls { top: 4px; left: 4px; right: 4px; gap: 3px; flex-wrap: wrap; }
+    .map-search-wrapper { max-width: 160px; flex-shrink: 1; min-width: 0; }
+    .map-search-input { font-size: 12px; padding: 5px 8px; }
+    #btnTogglePanel { display: none; }
+    .map-filter { font-size: 11px; padding: 4px 6px; max-width: 100px; }
+
+    /* Summary cards */
+    .summary-cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+    /* Modals full-width on mobile */
+    .modal { width: 95vw; max-width: none; max-height: 85vh; }
+
+    /* Timeline bar compact */
+    .timeline-bar { margin-left: 0; }
+    .activity-timeline { margin-left: 30px; }
+    .add-activity-btn { margin-left: 60px; }
 }
+
+/* Mobile map toggle bar - hidden on desktop */
+.mobile-map-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    user-select: none;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+.mobile-map-toggle:active { background: var(--bg-hover); }
+.mobile-map-toggle i { font-size: 9px; transition: transform 0.3s; }
+.mobile-map-toggle.flipped i { transform: rotate(180deg); }
 
 /* ===== Utility ===== */
 .drag-handle {
