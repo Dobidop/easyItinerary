@@ -12,6 +12,18 @@ if (!fs.existsSync(SHARED_DIR)) {
     fs.mkdirSync(SHARED_DIR);
 }
 
+const CSP = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+    "img-src 'self' data: https: blob:",
+    "font-src 'self' https://cdnjs.cloudflare.com",
+    "connect-src 'self' https://nominatim.openstreetmap.org https://photon.komoot.io https://overpass-api.de",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+].join('; ');
+
 const MIME_TYPES = {
     '.html': 'text/html',
     '.css': 'text/css',
@@ -85,7 +97,7 @@ const server = http.createServer(async (req, res) => {
             if (shareId && /^[a-f0-9]+$/.test(shareId)) {
                 // Validate the existing shareId format
             } else {
-                shareId = crypto.randomBytes(4).toString('hex');
+                shareId = crypto.randomBytes(8).toString('hex');
             }
             const filePath = path.join(SHARED_DIR, `${shareId}.json`);
 
@@ -184,6 +196,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, {
             'Content-Type': contentType,
             'Cache-Control': 'no-cache',
+            'Content-Security-Policy': CSP,
         });
         res.end(data);
     });

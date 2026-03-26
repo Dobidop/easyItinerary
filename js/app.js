@@ -765,7 +765,7 @@ const App = (() => {
         if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
-        return div.innerHTML;
+        return div.innerHTML.replace(/'/g, '&#39;');
     }
 
     // Format departure/arrival datetime-local values into a readable string
@@ -944,7 +944,7 @@ const ResourcePicker = (() => {
             if (!str) return '';
             const d = document.createElement('div');
             d.textContent = str;
-            return d.innerHTML;
+            return d.innerHTML.replace(/'/g, '&#39;');
         }
 
         return {
