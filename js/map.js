@@ -12,7 +12,6 @@ const MapModule = (() => {
     let showPotentials = false;
     let markerLookup = {};  // key → Leaflet marker, for hover highlighting
     let highlightedKey = null;
-    let hoverPanTimer = null;
 
     const tileSets = {
         dark: {
@@ -583,15 +582,11 @@ const MapModule = (() => {
         highlightedKey = key;
         const el = marker.getElement();
         if (el) el.classList.add('marker-highlight');
-        marker.openPopup();
-        // Pan into view after a short delay to avoid jumpy behavior
-        clearTimeout(hoverPanTimer);
+        // Only open popup if marker is in view (no panning on hover)
         const latlng = marker.getLatLng();
-        hoverPanTimer = setTimeout(() => {
-            if (highlightedKey === key && !map.getBounds().contains(latlng)) {
-                map.panTo(latlng);
-            }
-        }, 500);
+        if (map.getBounds().contains(latlng)) {
+            marker.openPopup();
+        }
     }
 
     function focusMarker(key) {
@@ -607,7 +602,6 @@ const MapModule = (() => {
     }
 
     function clearHighlight() {
-        clearTimeout(hoverPanTimer);
         if (highlightedKey) {
             const prev = markerLookup[highlightedKey];
             if (prev) {
