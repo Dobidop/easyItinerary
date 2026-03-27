@@ -137,7 +137,9 @@ const MapModule = (() => {
         resultsEl.classList.add('open');
 
         // Photon (by Komoot) — better fuzzy/multilingual search than Nominatim, same OSM data.
-        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=en`;
+        const bounds = map.getBounds();
+        const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&lang=en&bbox=${bbox}`;
 
         fetch(photonUrl)
         .then(res => res.json())
@@ -174,7 +176,9 @@ const MapModule = (() => {
 
     function searchNominatim(query) {
         const resultsEl = document.getElementById('mapSearchResults');
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1`;
+        const bounds = map.getBounds();
+        const viewbox = `${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()},${bounds.getSouth()}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1&viewbox=${viewbox}&bounded=1`;
 
         fetch(url, { headers: { 'Accept-Language': 'en' } })
         .then(res => res.json())
