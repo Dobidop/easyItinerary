@@ -2,7 +2,7 @@
 
 A single-page trip planner with an interactive map. Plan your days, track your budget, save resources, and see everything laid out on a map — all in one place.
 
-Built with vanilla HTML, CSS, and JavaScript. No frameworks, no build tools, no API keys required.
+Built with vanilla HTML, CSS, and JavaScript. No frameworks, no build tools. No API keys required for the core app.
 
 ## Features
 
@@ -34,6 +34,30 @@ PORT=8080 node server.js
 
 Alternatively, just open `index.html` directly in a browser. Everything works except the sharing feature (which needs the server).
 
+## Optional: AI Place Info (POI Server)
+
+The **Enhance with AI** button on resource cards can automatically fill in address, phone, opening hours, rating, and other details for places saved from Google Maps links. This requires a small companion server and an LLM API key.
+
+```bash
+# Copy the example config and fill in your details
+cp poi-server.env.example poi-server.env
+
+# Run alongside the main server
+node poi-server.js
+```
+
+Supported providers (set `POI_PROVIDER` in `poi-server.env`):
+
+| Provider | `POI_PROVIDER` | Notes |
+|---|---|---|
+| OpenAI | `openai` | `gpt-4o-mini` recommended, cost-effective |
+| Anthropic | `anthropic` | `claude-haiku-4-5-20251001` recommended |
+| LM Studio | `openai` | Set `POI_BASE_URL=http://localhost:1234`, no key needed |
+| Groq | `openai` | Set `POI_BASE_URL=https://api.groq.com/openai` |
+| OpenRouter | `openai` | Set `POI_BASE_URL=https://openrouter.ai/api` |
+
+Web search is performed via [Jina.ai](https://jina.ai/) + DuckDuckGo — no additional API key required. The model searches for the place, reads relevant pages, and returns structured data.
+
 ## File Structure
 
 ```
@@ -47,7 +71,9 @@ js/
   resources.js    Links/bookmarks, location sync, geocoding
   storage.js      localStorage CRUD, JSON import/export, sharing
   theme-init.js   Applies saved theme before page render
-server.js         Static file server + sharing API
+server.js               Static file server + sharing API
+poi-server.js           Optional AI place info extraction server
+poi-server.env.example  POI server configuration template
 ```
 
 ## Tech Stack

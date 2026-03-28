@@ -1300,6 +1300,9 @@ body {
 }
 .resource-actions button:hover { color: var(--text-primary); }
 .resource-actions .btn-delete:hover { color: var(--danger); }
+.resource-actions .poi-enhance-btn { color: var(--accent); }
+.resource-actions .poi-enhance-btn:hover { color: var(--accent-hover, var(--accent)); opacity: 0.8; }
+.resource-actions .poi-enhance-btn:disabled { opacity: 0.5; cursor: wait; }
 
 /* ===== Map ===== */
 .map-controls {

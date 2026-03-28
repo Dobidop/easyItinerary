@@ -1,4 +1,8 @@
 /.claude
 /CLAUDE.md
 /shared/
-start.bat
+poi-jobs.json
+startPOI.bat
+startEI.bat
+startAPI.bat
+*.env

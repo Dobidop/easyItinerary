@@ -132,7 +132,7 @@ const Resources = (() => {
                 const displayName = data.name || 'Location';
                 hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(displayName)}</strong>`;
 
-                // Reverse geocode for title if we don't have a name
+                // Enrich in background via OSM
                 if (!data.name) {
                     reverseGeocode(data.lat, data.lng).then(info => {
                         if (info && !document.getElementById('resourceTitle').value.trim()) {
@@ -140,12 +140,8 @@ const Resources = (() => {
                         }
                     });
                 }
-
-                // Fetch OSM details in background — non-blocking, just enriches if found
                 fetchPlaceDetails(data.lat, data.lng).then(details => {
-                    if (details) {
-                        applyPlaceDetails(details);
-                    }
+                    if (details) applyPlaceDetails(details);
                 });
                 return;
             }
@@ -255,6 +251,121 @@ const Resources = (() => {
             });
         }
         next();
+    }
+
+    /* ===== AI enhance — background polling ===== */
+    let poiServerAvailable = false;
+    let poiPollInterval = null;
+    const poiPollFailures = {}; // jobId -> consecutive failure count
+    const POI_MAX_FAILURES = 30; // ~5 minutes of failures before giving up
+
+    function applyPOIResult(res, poi) {
+        const catMap = { food: 'restaurant', restaurant: 'restaurant', hotel: 'hotel', lodging: 'hotel', sightseeing: 'sightseeing', shopping: 'shopping' };
+        if (poi.name) res.title = poi.name;
+        if (poi.address) res.notes = poi.address;
+        if (poi.city) res.city = poi.city;
+        if (poi.phone) res.phone = poi.phone;
+        if (poi.opening_hours) res.openingHours = poi.opening_hours;
+        if (poi.cuisine) res.cuisine = poi.cuisine;
+        if (poi.rating) res.stars = poi.rating + (poi.review_count ? ` (${poi.review_count})` : '');
+        if (poi.website && !res.url.includes('google')) res.url = poi.website;
+        if (poi.category) {
+            const mapped = catMap[poi.category];
+            if (mapped && (!res.category || res.category === 'general')) res.category = mapped;
+        }
+        delete res.pendingPoiJobId;
+    }
+
+    async function pollPendingJobs() {
+        if (!currentTrip) return;
+        const pending = (currentTrip.resources || []).filter(r => r.pendingPoiJobId);
+
+        // Nothing left — stop the interval
+        if (pending.length === 0) {
+            clearInterval(poiPollInterval);
+            poiPollInterval = null;
+            return;
+        }
+
+        let changed = false;
+        for (const res of pending) {
+            const jobId = res.pendingPoiJobId;
+            try {
+                const r = await fetch(`/api/poi/${jobId}`);
+                if (!r.ok) {
+                    // Count failures — clear stuck jobs after too many (e.g. server restarted, job lost)
+                    poiPollFailures[jobId] = (poiPollFailures[jobId] || 0) + 1;
+                    if (poiPollFailures[jobId] >= POI_MAX_FAILURES) {
+                        console.warn('[POI] Giving up on job', jobId, 'after too many failures');
+                        delete res.pendingPoiJobId;
+                        delete poiPollFailures[jobId];
+                        changed = true;
+                        showToast(`AI extraction timed out for: ${res.title}`);
+                    }
+                    continue;
+                }
+                poiPollFailures[jobId] = 0; // reset on success
+                const data = await r.json();
+                if (data.status === 'done' && data.result) {
+                    applyPOIResult(res, data.result);
+                    delete poiPollFailures[jobId];
+                    changed = true;
+                    showToast(`Enhanced: ${res.title}`);
+                } else if (data.status === 'error') {
+                    console.warn('[POI] Job failed:', jobId, data.error);
+                    delete res.pendingPoiJobId;
+                    delete poiPollFailures[jobId];
+                    changed = true;
+                    showToast(`AI extraction failed for: ${res.title}`);
+                }
+                // queued/running — leave pendingPoiJobId, try again next tick
+            } catch (e) {
+                console.warn('[POI] Poll error:', e);
+            }
+        }
+
+        if (changed) {
+            Storage.saveTrip(currentTrip);
+            render();
+        }
+    }
+
+    function startPoller() {
+        if (poiPollInterval) return; // already running
+        pollPendingJobs(); // fire immediately, don't wait for first interval tick
+        poiPollInterval = setInterval(pollPendingJobs, 10000);
+    }
+
+    // On init: check if POI server is available, show buttons + resume any pending jobs
+    fetch('/api/poi/health').then(r => r.ok ? r.json() : null).then(d => {
+        if (d && d.status === 'ok') {
+            poiServerAvailable = true;
+            if (currentTrip) render();
+            // Resume polling for any jobs pending before a page refresh
+            if ((currentTrip?.resources || []).some(r => r.pendingPoiJobId)) startPoller();
+        }
+    }).catch(() => {});
+
+    async function enhanceWithAI(idx) {
+        const res = currentTrip.resources[idx];
+        if (!res || !res.url) return;
+        if (res.pendingPoiJobId) { showToast('Already extracting...'); return; }
+
+        try {
+            const submitRes = await fetch('/api/poi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: res.url, lat: res.lat || null, lng: res.lng || null }),
+            });
+            if (!submitRes.ok) throw new Error();
+            const { jobId } = await submitRes.json();
+            res.pendingPoiJobId = jobId;
+            Storage.saveTrip(currentTrip);
+            render(); // shows spinner on button immediately
+            startPoller();
+        } catch {
+            showToast('POI server unavailable');
+        }
     }
 
     /* ===== Fetch place details from Overpass (OSM tags) ===== */
@@ -571,6 +682,10 @@ const Resources = (() => {
                     <div class="resource-actions">
                         ${statusBtn}
                         ${res.lat && res.lng ? `<button title="Show on map" onclick="MapModule.panTo(${res.lat}, ${res.lng}, 16)"><i class="fa-solid fa-map-location-dot"></i></button>` : ''}
+                        ${poiServerAvailable && res.url && isGoogleMapsUrl(res.url) ? (res.pendingPoiJobId
+                            ? `<button class="poi-enhance-btn" title="Extracting..." disabled><i class="fa-solid fa-spinner fa-spin"></i></button>`
+                            : `<button class="poi-enhance-btn" title="Enhance with AI" onclick="Resources.enhanceWithAI(${realIdx})"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`
+                        ) : ''}
                         ${res.url ? `<button title="Copy URL" onclick="Resources.copyUrl('${escapeHtml(res.url)}')"><i class="fa-solid fa-copy"></i></button>` : ''}
                         <button title="Edit" onclick="Resources.openModal(${realIdx})"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn-delete" title="Delete" onclick="Resources.deleteResource(${realIdx})"><i class="fa-solid fa-trash"></i></button>
@@ -633,5 +748,6 @@ const Resources = (() => {
         toggleStatus,
         resolveMissingCities,
         syncFromResources,
+        enhanceWithAI,
     };
 })();

@@ -80,6 +80,26 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // === API: Proxy to POI extraction server (private/local only) ===
+    if (pathname === '/api/poi' || pathname.startsWith('/api/poi/')) {
+        const poiPath = pathname === '/api/poi' ? '/extract'
+            : pathname === '/api/poi/health' ? '/health'
+            : '/status/' + pathname.slice('/api/poi/'.length);
+        try {
+            const body = req.method === 'POST' ? await readBody(req) : null;
+            const poiRes = await fetch(`http://127.0.0.1:3004${poiPath}`, {
+                method: req.method,
+                headers: { 'Content-Type': 'application/json' },
+                ...(body ? { body } : {}),
+            });
+            const poiData = await poiRes.text();
+            sendJson(res, poiRes.status, JSON.parse(poiData));
+        } catch (err) {
+            sendJson(res, 502, { error: 'POI server unavailable' });
+        }
+        return;
+    }
+
     // === API: Share a trip ===
     if (req.method === 'POST' && pathname === '/api/share') {
         try {
