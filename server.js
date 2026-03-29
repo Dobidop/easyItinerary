@@ -100,6 +100,34 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // === API: Resolve short URL (e.g. maps.app.goo.gl) ===
+    if (req.method === 'GET' && pathname === '/api/resolve') {
+        const target = new URL(req.url, `http://localhost`).searchParams.get('url');
+        if (!target) { sendJson(res, 400, { error: 'Missing url parameter' }); return; }
+        try {
+            const r = await fetch(target, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
+            });
+            let finalUrl = r.url;
+
+            // If HTTP redirect didn't escape the short URL, parse the body for an embedded Maps URL
+            if (/goo\.gl|maps\.app\.goo\.gl/i.test(finalUrl)) {
+                const body = await r.text();
+                const match = body.match(/https:\/\/(?:www\.)?google\.[a-z.]+\/maps\/[^"'\s\\<>]+/);
+                if (match) finalUrl = match[0].replace(/\\u003d/g, '=').replace(/\\u0026/g, '&');
+            }
+
+            console.log(`[resolve] ${target} → ${finalUrl}`);
+            sendJson(res, 200, { url: finalUrl });
+        } catch (err) {
+            console.error(`[resolve] Failed: ${err.message}`);
+            sendJson(res, 400, { error: 'Could not resolve URL' });
+        }
+        return;
+    }
+
     // === API: Share a trip ===
     if (req.method === 'POST' && pathname === '/api/share') {
         try {

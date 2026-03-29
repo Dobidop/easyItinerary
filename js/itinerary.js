@@ -290,6 +290,39 @@ const Itinerary = (() => {
         return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     }
 
+    // ===== Geographic utilities =====
+
+    function haversineKm(lat1, lng1, lat2, lng2) {
+        const R = 6371, rad = Math.PI / 180;
+        const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function daySpreadKm(activities) {
+        const pts = activities.filter(a => a.lat && a.lng);
+        if (pts.length < 2) return 0;
+        const lats = pts.map(a => a.lat), lngs = pts.map(a => a.lng);
+        return haversineKm(
+            Math.min(...lats), Math.min(...lngs),
+            Math.max(...lats), Math.max(...lngs)
+        );
+    }
+
+    function dayLoadLevel(activities) {
+        if (!activities.length) return '';
+        const count = activities.length;
+        const spread = daySpreadKm(activities);
+        if (count >= 7 || spread >= 15) return 'red';
+        if (count >= 4 || spread >= 5)  return 'amber';
+        return 'green';
+    }
+
+    function formatDistance(km) {
+        return km < 1 ? `${Math.round(km * 1000)}\u00a0m` : `${km.toFixed(1)}\u00a0km`;
+    }
+
     function getCategoryIcon(cat) {
         const icons = {
             sightseeing: 'fa-camera',
@@ -370,11 +403,12 @@ const Itinerary = (() => {
                 `;
             }).join('');
 
-            const activitiesHtml = day.activities.map((act, actIdx) => {
+            let activitiesHtml = '';
+            day.activities.forEach((act, actIdx) => {
                 const num = activityCounter++;
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
                 const city = getCity(act);
-                return `
+                activitiesHtml += `
                     <div class="activity-card" draggable="true" data-day="${dayIdx}" data-act="${actIdx}" data-marker-key="act-${dayIdx}-${actIdx}">
                         ${act.startTime ? `<span class="activity-time-label">${act.startTime}</span>` : ''}
                         <div class="activity-marker ${act.category}"><i class="fa-solid ${getCategoryIcon(act.category)}"></i></div>
@@ -401,7 +435,14 @@ const Itinerary = (() => {
                         </div>
                     </div>
                 `;
-            }).join('');
+                // Distance gap to next activity
+                const next = day.activities[actIdx + 1];
+                if (next && act.lat && act.lng && next.lat && next.lng) {
+                    const km = haversineKm(act.lat, act.lng, next.lat, next.lng);
+                    const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                    activitiesHtml += `<div class="activity-gap ${cls}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                }
+            });
 
             return `
                 <div class="day-card" data-day="${dayIdx}">
@@ -410,7 +451,7 @@ const Itinerary = (() => {
                             <i class="fa-solid fa-chevron-down"></i>
                             <div>
                                 <div class="day-title">Day ${dayIdx + 1}${day.label ? ' — ' + escapeHtml(day.label) : ''}</div>
-                                <div class="day-date">${formatDate(day.date)} <span class="day-summary">${actCount} ${actCount === 1 ? 'activity' : 'activities'}</span></div>
+                                <div class="day-date">${formatDate(day.date)} <span class="day-summary">${actCount} ${actCount === 1 ? 'activity' : 'activities'}${(() => { const lvl = dayLoadLevel(day.activities); const spread = daySpreadKm(day.activities); return lvl ? `<span class="day-load-badge ${lvl}" title="${actCount} activities, ${spread > 0 ? formatDistance(spread) + ' spread' : 'no location data'}"></span>` : ''; })()}</span></div>
                             </div>
                         </div>
                         <div class="day-header-actions">

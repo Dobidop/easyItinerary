@@ -106,8 +106,8 @@ const Resources = (() => {
     }
 
     /* ===== Fetch location data from URL ===== */
-    function fetchFromUrl() {
-        const url = document.getElementById('resourceUrl').value.trim();
+    async function fetchFromUrl() {
+        let url = document.getElementById('resourceUrl').value.trim();
         if (!url) {
             showToast('Paste a URL first');
             return;
@@ -116,6 +116,29 @@ const Resources = (() => {
         const hint = document.getElementById('resourceUrlHint');
         hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting location data...';
         hint.classList.add('visible');
+
+        // Resolve short URLs (goo.gl/maps, maps.app.goo.gl) server-side
+        if (/goo\.gl\/maps|maps\.app\.goo\.gl/i.test(url)) {
+            hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resolving short link...';
+            try {
+                const r = await fetch(`/api/resolve?url=${encodeURIComponent(url)}`);
+                if (r.ok) {
+                    const resolved = await r.json();
+                    // Strip tracking query params — everything useful is in the path + data= segment
+                    url = resolved.url.includes('google.') ? resolved.url.split('?')[0] : resolved.url;
+                    document.getElementById('resourceUrl').value = url;
+                } else {
+                    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Could not expand short link — try pasting the full Google Maps URL instead.';
+                    setTimeout(() => hint.classList.remove('visible'), 5000);
+                    return;
+                }
+            } catch {
+                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Short link resolution requires the server. Open via <code>node server.js</code>.';
+                setTimeout(() => hint.classList.remove('visible'), 5000);
+                return;
+            }
+            hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting location data...';
+        }
 
         // Extract from Google Maps URL
         if (isGoogleMapsUrl(url)) {
@@ -145,10 +168,38 @@ const Resources = (() => {
                 });
                 return;
             }
+
+            // URL has a place name but no coordinates (CID-based URL from mobile share)
+            // Try forward geocoding the address using the Latin-script parts of the name
+            if (data.name) {
+                hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching for location...';
+                if (!document.getElementById('resourceTitle').value.trim()) {
+                    document.getElementById('resourceTitle').value = data.name;
+                }
+                const query = data.name.match(/[A-Za-z0-9 ,.\-]+/g)?.map(s => s.trim()).filter(s => s.length > 2).join(' ').trim();
+                if (query) {
+                    try {
+                        const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
+                            headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
+                        });
+                        const results = await r.json();
+                        if (results.length) {
+                            document.getElementById('resourceLat').value = parseFloat(results[0].lat).toFixed(6);
+                            document.getElementById('resourceLng').value = parseFloat(results[0].lon).toFixed(6);
+                            hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(data.name)}</strong>`;
+                            fetchPlaceDetails(parseFloat(results[0].lat), parseFloat(results[0].lon)).then(details => {
+                                if (details) applyPlaceDetails(details);
+                            });
+                            return;
+                        }
+                    } catch {}
+                }
+                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Name found but no coordinates — pick location on map.';
+                setTimeout(() => hint.classList.remove('visible'), 5000);
+                return;
+            }
         }
 
-        // For non-Google URLs, try to resolve via Nominatim if it looks like an address
-        // Otherwise just show a message
         hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> No location data found in this URL. You can manually enter coordinates or use "Pick on Map".';
         setTimeout(() => hint.classList.remove('visible'), 5000);
     }
