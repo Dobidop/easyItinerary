@@ -9,7 +9,7 @@ Built with vanilla HTML, CSS, and JavaScript. No frameworks, no build tools. No 
 - **Day-by-day itinerary** — Add activities with times, locations, and links. Drag-and-drop to reorder. Set lodging departure/return points per day.
 - **Interactive map** — Leaflet + OpenStreetMap with search, click-to-place markers, animated route lines, and day filtering. Hover to highlight, click to pan.
 - **Budget tracking** — Set a total budget, log expenses by category, and see a visual breakdown. Supports 12 currencies.
-- **Resources** — Save links and places with coordinates. Mark them as "selected" or "potentials". Resources sync to linked activities and reservations.
+- **Resources** — Save links and places with coordinates. Paste any URL (Google Maps, TripAdvisor, hotel sites) and resolve short links automatically. Mark as "selected" or "potentials", then add directly to a day. Resources sync to linked activities and reservations.
 - **Reservations & transport** — Track flights, hotels, and transport with confirmation codes, dates, and links.
 - **Checklist** — Simple checklist for packing or to-dos.
 - **Sharing** — Share trips via link. Recipients see a live-updating read-only view.
@@ -36,7 +36,7 @@ Alternatively, just open `index.html` directly in a browser. Everything works ex
 
 ## Optional: AI Place Info (POI Server)
 
-The **Enhance with AI** button on resource cards can automatically fill in address, phone, opening hours, rating, and other details for places saved from Google Maps links. This requires a small companion server and an LLM API key.
+The **Enhance with AI** button on resource cards can automatically fill in address, phone, opening hours, rating, and other details for any saved URL. This requires a small companion server and an LLM API key (or a local model).
 
 ```bash
 # Copy the example config and fill in your details
