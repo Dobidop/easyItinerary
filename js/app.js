@@ -704,6 +704,135 @@ const App = (() => {
         document.getElementById('statActivities').textContent = totalActivities;
         document.getElementById('statBudget').textContent = `${sym}${spent.toFixed(spent % 1 === 0 ? 0 : 2)}`;
         document.getElementById('statLinks').textContent = totalLinks;
+
+        renderDayPlanStrip();
+    }
+
+    // ===== Day Plan Strip =====
+    function renderDayPlanStrip() {
+        const section = document.getElementById('dayPlanSection');
+        const container = document.getElementById('dayPlanStrip');
+        if (!section || !container) return;
+
+        const days = currentTrip.days || [];
+        if (days.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+        section.style.display = '';
+
+        // Build date → anchor map from reservations
+        const anchors = {}; // 'YYYY-MM-DD' → { flight, hotel, transit }
+        (currentTrip.reservations || []).forEach(res => {
+            const hits = [];
+            if (res.type === 'flight') {
+                if (res.depTime) hits.push({ d: res.depTime.split('T')[0], k: 'flight' });
+                if (res.arrTime) hits.push({ d: res.arrTime.split('T')[0], k: 'flight' });
+            } else if (res.type === 'hotel') {
+                if (res.checkIn && res.checkOut) {
+                    const [cy, cm, cd] = res.checkIn.split('-').map(Number);
+                    const [oy, om, od] = res.checkOut.split('-').map(Number);
+                    const cur = new Date(cy, cm - 1, cd);
+                    const end = new Date(oy, om - 1, od);
+                    while (cur <= end) {
+                        const mm = String(cur.getMonth() + 1).padStart(2, '0');
+                        const dd = String(cur.getDate()).padStart(2, '0');
+                        hits.push({ d: `${cur.getFullYear()}-${mm}-${dd}`, k: 'hotel' });
+                        cur.setDate(cur.getDate() + 1);
+                    }
+                } else {
+                    if (res.checkIn)  hits.push({ d: res.checkIn,  k: 'hotel' });
+                    if (res.checkOut) hits.push({ d: res.checkOut, k: 'hotel' });
+                }
+            } else if (res.type === 'train' || res.type === 'bus') {
+                if (res.transDepTime) hits.push({ d: res.transDepTime.split('T')[0], k: 'transit' });
+                if (res.transArrTime) hits.push({ d: res.transArrTime.split('T')[0], k: 'transit' });
+            } else {
+                if (res.date) hits.push({ d: res.date, k: 'other' });
+            }
+            hits.forEach(({ d, k }) => {
+                if (!d) return;
+                if (!anchors[d]) anchors[d] = {};
+                anchors[d][k] = true;
+            });
+        });
+
+        container.innerHTML = days.map((day, idx) => {
+            const count = (day.activities || []).length;
+
+            // Derive calendar date for this day (if trip has startDate)
+            // Use local date arithmetic to avoid UTC timezone shifts
+            let dayDate = null;
+            if (currentTrip.startDate) {
+                const [y, m, d] = currentTrip.startDate.split('-').map(Number);
+                const start = new Date(y, m - 1, d + idx);
+                const mm = String(start.getMonth() + 1).padStart(2, '0');
+                const dd = String(start.getDate()).padStart(2, '0');
+                dayDate = `${start.getFullYear()}-${mm}-${dd}`;
+            }
+
+            const anchor = dayDate ? (anchors[dayDate] || {}) : {};
+            const hasFlight  = !!anchor.flight;
+            const hasHotel   = !!anchor.hotel;
+            const hasTransit = !!anchor.transit;
+            const hasOther   = !!anchor.other;
+            const hasAnyAnchor = hasFlight || hasHotel || hasTransit || hasOther;
+
+            // Short label: "Jan\n5" or "D1"
+            let label;
+            if (dayDate) {
+                const [ly, lm, ld] = dayDate.split('-').map(Number);
+                const d = new Date(ly, lm - 1, ld);
+                const mon = d.toLocaleString('default', { month: 'short' });
+                label = `${mon}<br>${d.getDate()}`;
+            } else {
+                label = `D${idx + 1}`;
+            }
+
+            // Status
+            let status;
+            if (count === 0 && !hasAnyAnchor) status = 'empty';
+            else if (count === 0 && hasAnyAnchor) status = 'anchored';
+            else if (count <= 2) status = 'sparse';
+            else status = 'good';
+
+            const anchorIcons =
+                (hasFlight  ? '<i class="fa-solid fa-plane"></i>' : '') +
+                (hasHotel   ? '<i class="fa-solid fa-bed"></i>'   : '') +
+                (hasTransit && !hasFlight ? '<i class="fa-solid fa-train"></i>' : '') +
+                (hasOther   && !hasFlight && !hasHotel && !hasTransit ? '<i class="fa-solid fa-bookmark"></i>' : '');
+
+            let countDisplay;
+            if (count > 0) {
+                countDisplay = count;
+            } else if (hasAnyAnchor) {
+                countDisplay = '~';
+            } else {
+                countDisplay = '—';
+            }
+
+            const fullLabel = (day.label || `Day ${idx + 1}`).replace(/"/g, '&quot;');
+            const actWord = count !== 1 ? 'activities' : 'activity';
+            const anchorNote = hasAnyAnchor ? ' · reservation' : '';
+            return `<div class="day-plan-tile status-${status}" onclick="App.jumpToDay(${idx})" title="${fullLabel}: ${count} ${actWord}${anchorNote}">
+                <span class="dpt-label">${label}</span>
+                <span class="dpt-count">${countDisplay}</span>
+                <span class="dpt-anchors">${anchorIcons}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function jumpToDay(idx) {
+        switchSection('itinerary');
+        setTimeout(() => {
+            const dayEls = document.querySelectorAll('#itineraryDays .day-card');
+            if (dayEls[idx]) {
+                dayEls[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Brief highlight
+                dayEls[idx].classList.add('day-card-flash');
+                setTimeout(() => dayEls[idx].classList.remove('day-card-flash'), 800);
+            }
+        }, 60);
     }
 
     // ===== Modals =====
@@ -837,6 +966,7 @@ const App = (() => {
         renderReservations,
         toggleChecklistItem,
         deleteChecklistItem,
+        jumpToDay,
     };
 })();
 
