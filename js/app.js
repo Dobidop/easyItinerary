@@ -466,6 +466,13 @@ const App = (() => {
         }
         populateReservationResources();
         toggleReservationFields();
+
+        const nudge = document.getElementById('reservationResourceNudge');
+        if (nudge) {
+            const hasResources = (currentTrip.resources || []).some(r => (r.status || 'selected') === 'selected');
+            nudge.style.display = (idx === null && hasResources) ? '' : 'none';
+        }
+
         modal.classList.add('open');
     }
 

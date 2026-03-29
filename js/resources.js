@@ -752,7 +752,7 @@ const Resources = (() => {
             if (res.stars) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-star"></i> ${escapeHtml(res.stars)} stars</span>`);
 
             const statusBtn = isPotential
-                ? `<button title="Move to shortlisted" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-solid fa-check-circle"></i></button>`
+                ? `<button title="Move to selected" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-solid fa-check-circle"></i></button>`
                 : `<button title="Move to potentials" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-regular fa-lightbulb"></i></button>`;
 
             const linkedDays = getResourceDays(res.id);
