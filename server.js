@@ -104,6 +104,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && pathname === '/api/resolve') {
         const target = new URL(req.url, `http://localhost`).searchParams.get('url');
         if (!target) { sendJson(res, 400, { error: 'Missing url parameter' }); return; }
+        const targetHost = (() => { try { return new URL(target).hostname; } catch { return ''; } })();
+        const ALLOWED_HOSTS = ['goo.gl', 'maps.app.goo.gl'];
+        if (!ALLOWED_HOSTS.some(h => targetHost === h || targetHost.endsWith('.' + h))) {
+            sendJson(res, 400, { error: 'Domain not allowed' });
+            return;
+        }
         try {
             const r = await fetch(target, {
                 method: 'GET',
