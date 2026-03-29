@@ -186,6 +186,8 @@ const App = (() => {
         };
         const el = document.getElementById(sectionMap[name]);
         if (el) el.classList.add('active');
+        const panel = document.querySelector('.panel-content');
+        if (panel) panel.scrollTop = 0;
     }
 
     // ===== Top Bar =====
