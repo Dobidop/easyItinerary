@@ -134,14 +134,7 @@ Use empty string "" for any field you cannot find.
 For category use exactly one of: restaurant, hotel, sightseeing, shopping, general.
 For opening_hours summarize concisely, e.g. "Mon-Sat 10:00-22:00, Sun closed".`;
 
-function buildPrompt(placeName, locationHint) {
-    const loc = locationHint ? ` in ${locationHint}` : '';
-    return `Find accurate, current information about "${placeName}"${loc}.
-
-Search for it, then fetch a relevant page (official website, Google Maps, TripAdvisor, etc.) for details like phone number, opening hours, and prices.
-
-Return a JSON object with these fields:
-  name          - Official place name
+const JSON_FIELDS = `  name          - Official place name
   category      - restaurant, hotel, sightseeing, shopping, or general
   address       - Full street address
   city          - City name
@@ -153,6 +146,24 @@ Return a JSON object with these fields:
   review_count  - Number of reviews
   cuisine       - Cuisine type (restaurants only)
   description   - One-line description of the place`;
+
+function buildPrompt(placeName, locationHint) {
+    const loc = locationHint ? ` in ${locationHint}` : '';
+    return `Find accurate, current information about "${placeName}"${loc}.
+
+Search for it, then fetch a relevant page (official website, Google Maps, TripAdvisor, etc.) for details like phone number, opening hours, and prices.
+
+Return a JSON object with these fields:\n${JSON_FIELDS}`;
+}
+
+function buildPromptForUrl(url) {
+    return `Fetch the following URL and extract place information from it:
+${url}
+
+Use fetch_url to read the page content, then return the place details as JSON.
+If the page doesn't contain enough detail, use web_search to find more about the place.
+
+Return a JSON object with these fields:\n${JSON_FIELDS}`;
 }
 
 // ===== Jina.ai fetcher =====
@@ -403,19 +414,73 @@ function parseJsonResponse(text) {
 
 async function extractPOI(url, lat, lng) {
     const placeName = extractPlaceName(url);
-    if (!placeName) return { error: 'Could not extract place name from URL' };
 
-    let locationHint = '';
-    if (lat && lng) {
-        locationHint = await reverseGeocode(lat, lng);
-        console.log(`[POI] "${placeName}" — location: ${locationHint || '(unknown)'}`);
+    if (placeName) {
+        // Google Maps URL — use place name + location hint from coordinates
+        let locationHint = '';
+        if (lat && lng) {
+            locationHint = await reverseGeocode(lat, lng);
+            console.log(`[POI] "${placeName}" — location: ${locationHint || '(unknown)'}`);
+        }
+        const rawText = PROVIDER === 'anthropic'     ? await runAnthropicLoop(placeName, locationHint)
+                      : PROVIDER === 'poorclaudeapi' ? await runPoorClaudeAPILoop(placeName, locationHint)
+                      : await runOpenAILoop(placeName, locationHint);
+        return parseJsonResponse(rawText);
+    } else {
+        // Non-Google URL — fetch and extract directly via AI
+        console.log(`[POI] Extracting from URL: ${url.substring(0, 80)}`);
+        const rawText = PROVIDER === 'poorclaudeapi'
+            ? await runPoorClaudeAPIWithUrl(url)
+            : await runLoopWithUrl(url);
+        return parseJsonResponse(rawText);
     }
+}
 
-    const rawText = PROVIDER === 'anthropic'     ? await runAnthropicLoop(placeName, locationHint)
-                  : PROVIDER === 'poorclaudeapi' ? await runPoorClaudeAPILoop(placeName, locationHint)
-                  : await runOpenAILoop(placeName, locationHint);
+async function runLoopWithUrl(url) {
+    const messages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildPromptForUrl(url) },
+    ];
+    for (let turn = 0; turn < 8; turn++) {
+        const res = await fetch(`${BASE_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+            body: JSON.stringify({ model: MODEL, messages, tools: TOOLS_OPENAI }),
+        });
+        if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+        const data = await res.json();
+        const choice = data.choices?.[0];
+        if (!choice) throw new Error('Empty response');
+        messages.push(choice.message);
+        if (choice.finish_reason === 'stop') return choice.message.content || '';
+        if (choice.finish_reason === 'tool_calls') {
+            for (const tc of choice.message.tool_calls || []) {
+                const result = await executeTool(tc.function.name, JSON.parse(tc.function.arguments));
+                messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+            }
+        }
+    }
+    throw new Error('Max turns reached');
+}
 
-    return parseJsonResponse(rawText);
+async function runPoorClaudeAPIWithUrl(url) {
+    const prompt = `Fetch and extract place information from this URL: ${url}
+Search the web if needed to find: name, address, city, phone, website, opening hours, price level, rating, reviews, cuisine (if restaurant), and a brief description.
+Return ONLY the structured JSON. Leave fields as empty string "" if not found.`;
+    const res = await fetch(`${BASE_URL}/v1/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            prompt, model: MODEL, max_budget_usd: 0.25,
+            system_prompt: 'You are a data extraction assistant. Return valid JSON only.',
+            json_schema: POOR_CLAUDE_JSON_SCHEMA,
+            allowed_tools: ['WebSearch'],
+        }),
+    });
+    if (!res.ok) throw new Error(`poorClaudeAPI ${res.status}`);
+    const data = await res.json();
+    if (!data.response || data.response.startsWith('Error:')) throw new Error(data.response || 'Empty response');
+    return data.response;
 }
 
 // ===== Job queue =====
@@ -517,8 +582,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/extract') {
         try {
             const { url, lat, lng } = JSON.parse(await readBody(req));
-            if (!url || !/google\.\w+\/maps/.test(url)) {
-                return send(res, 400, { error: 'Invalid Google Maps URL' });
+            if (!url || !url.startsWith('http')) {
+                return send(res, 400, { error: 'Invalid URL' });
             }
             const jobId = enqueue(url, lat || null, lng || null);
             const queuePos = [...jobs.values()].filter(j => j.status === 'queued').length;

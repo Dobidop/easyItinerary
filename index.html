@@ -195,7 +195,7 @@
                         <button class="btn btn-sm btn-add" id="btnAddResource"><i class="fa-solid fa-plus"></i> Add Link</button>
                     </div>
                     <div class="resource-status-tabs">
-                        <button class="status-tab active" data-status="selected"><i class="fa-solid fa-check-circle"></i> Selected</button>
+                        <button class="status-tab active" data-status="selected"><i class="fa-solid fa-check-circle"></i> Shortlisted</button>
                         <button class="status-tab" data-status="potential"><i class="fa-regular fa-lightbulb"></i> Potentials</button>
                     </div>
                     <div class="resource-filters">
@@ -254,6 +254,9 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>Link a saved resource (optional)</label>
+                    <div class="form-hint form-nudge" id="activityResourceNudge" style="display:none">
+                        <i class="fa-solid fa-lightbulb"></i> Tip: linking a shortlisted resource keeps your research and plan connected — coordinates, details, and notes carry over automatically.
+                    </div>
                     <div class="resource-picker" id="activityResourcePicker">
                         <div class="resource-picker-input-row">
                             <input type="text" class="resource-picker-search" placeholder="Search resources..." autocomplete="off" />
@@ -419,7 +422,7 @@
                 <div class="form-group">
                     <label>URL</label>
                     <div class="input-with-action">
-                        <input type="url" id="resourceUrl" placeholder="Paste a Google Maps or other URL..." />
+                        <input type="url" id="resourceUrl" placeholder="Paste any URL — Google Maps, TripAdvisor, hotel site..." />
                         <button class="btn btn-sm" id="btnFetchFromUrl" title="Extract location data from URL"><i class="fa-solid fa-wand-magic-sparkles"></i> Fetch</button>
                     </div>
                     <div class="form-hint" id="resourceUrlHint"></div>

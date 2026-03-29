@@ -621,6 +621,43 @@ body {
 .day-load-badge.amber  { background: var(--warning); }
 .day-load-badge.red    { background: var(--danger); }
 
+.day-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--success);
+    font-weight: 500;
+}
+.day-plan-badge i { font-size: 10px; }
+
+.add-to-day-row {
+    padding: 6px 10px 4px;
+    border-top: 1px solid var(--border);
+}
+.add-to-day-select {
+    width: 100%;
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+.add-to-day-select:hover { border-color: var(--accent); }
+
+.form-nudge {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
 .activity-gap {
     display: flex;
     align-items: center;

@@ -200,8 +200,13 @@ const Resources = (() => {
             }
         }
 
-        hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> No location data found in this URL. You can manually enter coordinates or use "Pick on Map".';
-        setTimeout(() => hint.classList.remove('visible'), 5000);
+        // Non-Google URL — guide user based on what's available
+        if (poiServerAvailable) {
+            hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> No map link detected. Save this resource then click <i class="fa-solid fa-wand-magic-sparkles"></i> to extract details with AI.';
+        } else {
+            hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> No location data found. Use "Pick on Map" to add coordinates.';
+        }
+        setTimeout(() => hint.classList.remove('visible'), 6000);
     }
 
     /* ===== Enhanced Google Maps extraction ===== */
@@ -667,6 +672,37 @@ const Resources = (() => {
         MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
     }
 
+    function getResourceDays(resId) {
+        if (!currentTrip.days || !resId) return [];
+        return currentTrip.days
+            .map((day, i) => ({ idx: i, label: day.label ? `Day ${i + 1} — ${day.label}` : `Day ${i + 1}` }))
+            .filter((_, i) => (currentTrip.days[i].activities || []).some(a => a.linkedResourceId === resId));
+    }
+
+    function addResourceToDay(resIdx, dayIdx) {
+        const res = currentTrip.resources[resIdx];
+        const day = currentTrip.days?.[dayIdx];
+        if (!res || !day) return;
+        if ((day.activities || []).some(a => a.linkedResourceId === res.id)) {
+            showToast(`Already in Day ${dayIdx + 1}`); return;
+        }
+        if (!day.activities) day.activities = [];
+        day.activities.push({
+            title: res.title,
+            category: res.category || 'general',
+            lat: res.lat || null,
+            lng: res.lng || null,
+            link: res.url || '',
+            address: res.address || '',
+            description: res.notes || '',
+            linkedResourceId: res.id || null,
+        });
+        Storage.saveTrip(currentTrip);
+        MapModule.updateMarkers(currentTrip, document.getElementById('mapDayFilter').value);
+        render();
+        showToast(`Added "${res.title}" to Day ${dayIdx + 1}`);
+    }
+
     function render() {
         const container = document.getElementById('resourcesList');
         let resources = currentTrip.resources || [];
@@ -716,8 +752,20 @@ const Resources = (() => {
             if (res.stars) detailTags.push(`<span class="resource-detail"><i class="fa-solid fa-star"></i> ${escapeHtml(res.stars)} stars</span>`);
 
             const statusBtn = isPotential
-                ? `<button title="Promote to selected" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-solid fa-check-circle"></i></button>`
+                ? `<button title="Move to shortlisted" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-solid fa-check-circle"></i></button>`
                 : `<button title="Move to potentials" onclick="Resources.toggleStatus(${realIdx})"><i class="fa-regular fa-lightbulb"></i></button>`;
+
+            const linkedDays = getResourceDays(res.id);
+            const dayBadge = linkedDays.length
+                ? `<span class="day-plan-badge"><i class="fa-solid fa-calendar-check"></i> ${linkedDays.map(d => d.label).join(', ')}</span>`
+                : '';
+
+            const addToDayControl = !isPotential && currentTrip.days?.length
+                ? `<select class="add-to-day-select" title="Add to day plan" onchange="Resources.addResourceToDay(${realIdx}, parseInt(this.value)); this.value=''">
+                    <option value="">&#128197; Add to day…</option>
+                    ${(currentTrip.days).map((d, i) => `<option value="${i}">Day ${i + 1}${d.label ? ' — ' + escapeHtml(d.label) : ''}</option>`).join('')}
+                   </select>`
+                : '';
 
             return `
                 <div class="resource-card ${isPotential ? 'potential' : ''}" data-marker-key="${res.id ? 'res-' + res.id : ''}">
@@ -729,11 +777,12 @@ const Resources = (() => {
                         ${res.url ? `<span class="resource-url">${escapeHtml(urlDisplay)}</span>` : ''}
                         ${detailTags.length ? `<div class="resource-details">${detailTags.join('')}</div>` : ''}
                         ${res.notes ? `<div class="resource-notes">${escapeHtml(res.notes)}</div>` : ''}
+                        ${dayBadge}
                     </div>
                     <div class="resource-actions">
                         ${statusBtn}
                         ${res.lat && res.lng ? `<button title="Show on map" onclick="MapModule.panTo(${res.lat}, ${res.lng}, 16)"><i class="fa-solid fa-map-location-dot"></i></button>` : ''}
-                        ${poiServerAvailable && res.url && isGoogleMapsUrl(res.url) ? (res.pendingPoiJobId
+                        ${poiServerAvailable && res.url ? (res.pendingPoiJobId
                             ? `<button class="poi-enhance-btn" title="Extracting..." disabled><i class="fa-solid fa-spinner fa-spin"></i></button>`
                             : `<button class="poi-enhance-btn" title="Enhance with AI" onclick="Resources.enhanceWithAI(${realIdx})"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`
                         ) : ''}
@@ -741,6 +790,7 @@ const Resources = (() => {
                         <button title="Edit" onclick="Resources.openModal(${realIdx})"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn-delete" title="Delete" onclick="Resources.deleteResource(${realIdx})"><i class="fa-solid fa-trash"></i></button>
                     </div>
+                    ${addToDayControl ? `<div class="add-to-day-row">${addToDayControl}</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -800,5 +850,6 @@ const Resources = (() => {
         resolveMissingCities,
         syncFromResources,
         enhanceWithAI,
+        addResourceToDay,
     };
 })();

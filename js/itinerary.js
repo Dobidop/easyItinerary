@@ -149,6 +149,15 @@ const Itinerary = (() => {
             document.getElementById('activityLng').value = '';
             activityPicker.clear();
         }
+
+        // Show nudge toward resource linking only when adding a new activity
+        // and there are shortlisted resources available to link
+        const nudge = document.getElementById('activityResourceNudge');
+        if (nudge) {
+            const hasResources = (currentTrip.resources || []).some(r => (r.status || 'selected') === 'selected');
+            nudge.style.display = (actIdx === null && hasResources) ? '' : 'none';
+        }
+
         modal.classList.add('open');
     }
 
