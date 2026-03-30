@@ -1244,6 +1244,37 @@ body {
     color: #fff;
 }
 
+.resource-search-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+}
+.resource-search-row i { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+.resource-search-row input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.resource-search-row input::placeholder { color: var(--text-muted); }
+.resource-search-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+    line-height: 1;
+}
+.resource-search-clear:hover { color: var(--text-primary); }
+
 .resource-filters {
     display: flex;
     flex-wrap: wrap;

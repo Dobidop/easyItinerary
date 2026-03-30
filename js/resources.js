@@ -4,6 +4,7 @@ const Resources = (() => {
     let editingIdx = null;
     let activeFilter = 'all';
     let activeStatus = 'selected';
+    let activeSearch = '';
 
     const categoryIcons = {
         restaurant: 'fa-utensils',
@@ -70,6 +71,21 @@ const Resources = (() => {
                 activeStatus = btn.dataset.status;
                 render();
             });
+        });
+
+        const searchInput = document.getElementById('resourceSearch');
+        const clearBtn = document.getElementById('btnClearResourceSearch');
+        searchInput.addEventListener('input', () => {
+            activeSearch = searchInput.value.trim().toLowerCase();
+            clearBtn.style.display = activeSearch ? '' : 'none';
+            render();
+        });
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            activeSearch = '';
+            clearBtn.style.display = 'none';
+            searchInput.focus();
+            render();
         });
     }
 
@@ -712,6 +728,14 @@ const Resources = (() => {
 
         if (activeFilter !== 'all') {
             resources = resources.filter(r => r.category === activeFilter);
+        }
+
+        if (activeSearch) {
+            resources = resources.filter(r =>
+                (r.title || '').toLowerCase().includes(activeSearch) ||
+                (r.notes || '').toLowerCase().includes(activeSearch) ||
+                (r.city  || '').toLowerCase().includes(activeSearch)
+            );
         }
 
         // Update tab counts
