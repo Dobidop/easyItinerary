@@ -136,16 +136,6 @@ const App = (() => {
         });
 
         // Toggle location labels
-        const showLoc = localStorage.getItem('easyitinerary-show-locations') !== 'false';
-        if (showLoc) document.body.classList.add('show-locations');
-        document.getElementById('btnToggleLocations').classList.toggle('active', showLoc);
-        document.getElementById('btnToggleLocations').addEventListener('click', () => {
-            document.body.classList.toggle('show-locations');
-            const on = document.body.classList.contains('show-locations');
-            document.getElementById('btnToggleLocations').classList.toggle('active', on);
-            localStorage.setItem('easyitinerary-show-locations', on);
-        });
-
         // Fit map button
         document.getElementById('btnFitMap').addEventListener('click', () => {
             MapModule.fitBounds();
@@ -791,6 +781,46 @@ const App = (() => {
                 label = `D${idx + 1}`;
             }
 
+            // Derive a location name for this day
+            let dayLocation = '';
+            // 1. Day label after "—" (e.g. "Day 1 — Florence" → "Florence")
+            if (day.label && day.label.includes('—')) {
+                dayLocation = day.label.split('—').slice(1).join('—').trim();
+            } else if (day.label && !/^day\s*\d+$/i.test(day.label.trim())) {
+                dayLocation = day.label.trim();
+            }
+            // 2. Most common city across activities (via linked resource or address)
+            if (!dayLocation) {
+                const cities = (day.activities || []).map(a => {
+                    if (a.linkedResourceId) {
+                        const res = (currentTrip.resources || []).find(r => r.id === a.linkedResourceId);
+                        if (res && res.city) return res.city;
+                    }
+                    if (a.address) {
+                        const parts = a.address.split(',').map(p => p.trim()).filter(Boolean);
+                        if (parts.length >= 2) return parts[parts.length - 2];
+                    }
+                    return '';
+                }).filter(Boolean);
+                if (cities.length) {
+                    const freq = {};
+                    cities.forEach(c => freq[c] = (freq[c] || 0) + 1);
+                    dayLocation = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+                }
+            }
+            // 3. Lodging city from reservations spanning this day
+            if (!dayLocation && dayDate) {
+                const lodging = (currentTrip.reservations || []).find(r =>
+                    r.type === 'hotel' && r.checkIn <= dayDate && r.checkOut >= dayDate
+                );
+                if (lodging && lodging.linkedResourceId) {
+                    const res = (currentTrip.resources || []).find(r => r.id === lodging.linkedResourceId);
+                    if (res && res.city) dayLocation = res.city;
+                }
+            }
+            // Truncate to keep tiles compact
+            const locationStr = dayLocation.length > 12 ? dayLocation.slice(0, 11) + '…' : dayLocation;
+
             // Status
             let status;
             if (count === 0 && !hasAnyAnchor) status = 'empty';
@@ -816,9 +846,10 @@ const App = (() => {
             const fullLabel = (day.label || `Day ${idx + 1}`).replace(/"/g, '&quot;');
             const actWord = count !== 1 ? 'activities' : 'activity';
             const anchorNote = hasAnyAnchor ? ' · reservation' : '';
-            return `<div class="day-plan-tile status-${status}" onclick="App.jumpToDay(${idx})" title="${fullLabel}: ${count} ${actWord}${anchorNote}">
+            return `<div class="day-plan-tile status-${status}" onclick="App.jumpToDay(${idx})" title="${fullLabel}: ${count} ${actWord}${anchorNote}${dayLocation ? ' · ' + dayLocation : ''}">
                 <span class="dpt-label">${label}</span>
                 <span class="dpt-count">${countDisplay}</span>
+                ${locationStr ? `<span class="dpt-loc">${escapeHtml(locationStr)}</span>` : '<span class="dpt-loc"></span>'}
                 <span class="dpt-anchors">${anchorIcons}</span>
             </div>`;
         }).join('');
