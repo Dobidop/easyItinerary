@@ -375,11 +375,19 @@ const MapModule = (() => {
         highlightedKey = null;
     }
 
+    function popupUrlDisplay(url) {
+        try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'link'; }
+    }
+
+    function popupTruncate(str, max) {
+        return str && str.length > max ? str.slice(0, max) + '…' : str;
+    }
+
     function addMarker(lat, lng, popupHtml, category, number, opacity, key) {
         const icon = createMarkerIcon(category || 'other', number);
         const marker = L.marker([lat, lng], { icon, opacity: opacity ?? 1 }).addTo(map);
         if (popupHtml) {
-            marker.bindPopup(popupHtml, { maxWidth: 250, autoPan: false });
+            marker.bindPopup(popupHtml, { maxWidth: 280, autoPan: false });
         }
         markers.push(marker);
         if (key) markerLookup[key] = marker;
@@ -397,14 +405,15 @@ const MapModule = (() => {
             if (dayFilter !== 'all' && dayFilter !== String(dayIdx)) return;
             day.activities.forEach((act, actIdx) => {
                 if (act.lat && act.lng) {
-                    const timeStr = act.startTime ? `<p><i class="fa-regular fa-clock"></i> ${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}</p>` : '';
-                    const linkStr = act.link ? `<p><a href="${escapeHtml(act.link)}" target="_blank">Open link</a></p>` : '';
+                    const timeStr = act.startTime ? `<p><i class="fa-regular fa-clock"></i> ${act.startTime}${act.endTime ? ' – ' + act.endTime : ''}</p>` : '';
+                    const linkStr = act.link ? `<p><a href="${escapeHtml(act.link)}" target="_blank">${escapeHtml(popupUrlDisplay(act.link))} ↗</a></p>` : '';
                     const dayLabel = dayFilter === 'all' ? `<p style="font-size:11px;color:var(--text-muted)">Day ${dayIdx + 1}</p>` : '';
+                    const descStr = act.description ? `<p>${escapeHtml(popupTruncate(act.description, 100))}</p>` : '';
                     const popup = `
                         <h4>${escapeHtml(act.title)}</h4>
                         ${dayLabel}
                         ${timeStr}
-                        <p>${escapeHtml(act.description || '')}</p>
+                        ${descStr}
                         ${act.address ? `<p><i class="fa-solid fa-location-dot"></i> ${escapeHtml(act.address)}</p>` : ''}
                         ${linkStr}
                     `;
@@ -447,11 +456,23 @@ const MapModule = (() => {
                 if (isPotential && !showPotentials) return;
                 if (res.lat && res.lng) {
                     const statusLabel = isPotential ? '<p style="font-size:11px;color:var(--text-muted);font-style:italic">Potential</p>' : '';
+                    const cityStr = res.city ? `<span style="font-size:11px;color:var(--text-muted)"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(res.city)}</span>` : '';
+                    const starsStr = res.stars ? `<p><i class="fa-solid fa-star" style="color:#f5a623"></i> ${escapeHtml(res.stars)}</p>` : '';
+                    const cuisineStr = res.cuisine ? `<p><i class="fa-solid fa-utensils"></i> ${escapeHtml(res.cuisine)}</p>` : '';
+                    const hoursStr = res.openingHours ? `<p><i class="fa-regular fa-clock"></i> ${escapeHtml(popupTruncate(res.openingHours, 60))}</p>` : '';
+                    const phoneStr = res.phone ? `<p><i class="fa-solid fa-phone"></i> ${escapeHtml(res.phone)}</p>` : '';
+                    const notesStr = res.notes ? `<p style="color:var(--text-muted);font-size:11px">${escapeHtml(popupTruncate(res.notes, 80))}</p>` : '';
+                    const linkStr = res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(popupUrlDisplay(res.url))} ↗</a></p>` : '';
                     const popup = `
                         <h4>${escapeHtml(res.title)}</h4>
                         ${statusLabel}
-                        ${res.url ? `<p><a href="${escapeHtml(res.url)}" target="_blank">${escapeHtml(res.url)}</a></p>` : ''}
-                        ${res.notes ? `<p>${escapeHtml(res.notes)}</p>` : ''}
+                        ${cityStr}
+                        ${starsStr}
+                        ${cuisineStr}
+                        ${hoursStr}
+                        ${phoneStr}
+                        ${notesStr}
+                        ${linkStr}
                     `;
                     addMarker(res.lat, res.lng, popup, res.category, null, isPotential ? 0.45 : undefined, `res-${res.id}`);
                 }
