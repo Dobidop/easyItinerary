@@ -332,6 +332,94 @@ const Itinerary = (() => {
         return km < 1 ? `${Math.round(km * 1000)}\u00a0m` : `${km.toFixed(1)}\u00a0km`;
     }
 
+    // ===== OSRM routing =====
+    const osrmCache = {};
+    let osrmLastFetch = 0;
+    const OSRM_MIN_INTERVAL = 300; // ms between requests to respect demo server
+
+    async function fetchOsrmSegment(lat1, lng1, lat2, lng2) {
+        const key = `${lat1},${lng1}|${lat2},${lng2}`;
+        if (osrmCache[key]) return osrmCache[key];
+
+        // Rate limit: wait if last request was too recent
+        const now = Date.now();
+        const wait = OSRM_MIN_INTERVAL - (now - osrmLastFetch);
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        osrmLastFetch = Date.now();
+
+        try {
+            const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+            const r = await fetch(url);
+            if (!r.ok) { console.warn(`[OSRM] ${r.status} for ${url}`); return null; }
+            const data = await r.json();
+            const route = data.routes && data.routes[0];
+            if (!route) return null;
+            const result = { duration: route.duration, distance: route.distance };
+            osrmCache[key] = result;
+            return result;
+        } catch (e) {
+            console.warn('[OSRM] fetch failed:', e.message);
+            return null;
+        }
+    }
+
+    function formatOsrmGap(result, walkingHint) {
+        const distKm = result.distance / 1000;
+        const distStr = formatDistance(distKm);
+        const mins = walkingHint
+            ? Math.round((distKm / 5) * 60)   // 5 km/h walking estimate
+            : Math.round(result.duration / 60); // OSRM driving duration
+        if (mins < 1) return distStr;
+        return `${distStr} · ~${mins}\u00a0min`;
+    }
+
+    async function updateOsrmGaps(dayIdx, activities, dep, ret) {
+        // Build flat list of segments: { lat1, lng1, lat2, lng2, gapId }
+        const segments = [];
+
+        // Collect waypoints with their gap element IDs
+        // dep → first act: data-gap="${dayIdx}-dep"
+        // act[i] → act[i+1]: data-gap="${dayIdx}-i"
+        // last act → ret: data-gap="${dayIdx}-ret"
+
+        const validActs = activities.map((a, i) => ({ lat: a.lat, lng: a.lng, idx: i, valid: !!(a.lat && a.lng) }));
+
+        if (dep && dep.lat && dep.lng) {
+            const first = validActs.find(a => a.valid);
+            if (first) segments.push({ lat1: dep.lat, lng1: dep.lng, lat2: first.lat, lng2: first.lng, gapId: `${dayIdx}-dep` });
+        }
+
+        for (let i = 0; i < activities.length - 1; i++) {
+            const a = activities[i], b = activities[i + 1];
+            if (!a.lat || !a.lng || !b.lat || !b.lng) continue;
+            segments.push({ lat1: a.lat, lng1: a.lng, lat2: b.lat, lng2: b.lng, gapId: `${dayIdx}-${i}` });
+        }
+
+        if (ret && ret.lat && ret.lng) {
+            const last = [...validActs].reverse().find(a => a.valid);
+            if (last) segments.push({ lat1: last.lat, lng1: last.lng, lat2: ret.lat, lng2: ret.lng, gapId: `${dayIdx}-ret` });
+        }
+
+        for (const seg of segments) {
+            const el = document.querySelector(`.activity-gap[data-gap="${seg.gapId}"]`);
+            if (!el) continue;
+            const straightKm = haversineKm(seg.lat1, seg.lng1, seg.lat2, seg.lng2);
+            if (straightKm > 800) continue; // skip — likely a flight, no meaningful driving route
+            const isWalkable = straightKm < 2;
+            // OSRM demo server only supports driving — use it for routing distance,
+            // then estimate walk time from road distance for short segments
+            const result = await fetchOsrmSegment(seg.lat1, seg.lng1, seg.lat2, seg.lng2);
+            if (!result) continue;
+            const distKm = result.distance / 1000;
+            const cls = distKm >= 8 ? 'red' : distKm >= 2 ? 'amber' : '';
+            const icon = isWalkable
+                ? '<i class="fa-solid fa-person-walking"></i>'
+                : '<i class="fa-solid fa-car"></i>';
+            el.className = `activity-gap ${cls}`;
+            el.innerHTML = `${icon} ${formatOsrmGap(result, isWalkable)}`;
+        }
+    }
+
     function getCategoryIcon(cat) {
         const icons = {
             sightseeing: 'fa-camera',
@@ -413,8 +501,15 @@ const Itinerary = (() => {
             }).join('');
 
             let activitiesHtml = '';
+            // Gap from lodging departure to first activity
+            const firstAct = day.activities[0];
+            if (dep && dep.lat && dep.lng && firstAct && firstAct.lat && firstAct.lng) {
+                const km = haversineKm(dep.lat, dep.lng, firstAct.lat, firstAct.lng);
+                const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-dep"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+            }
             day.activities.forEach((act, actIdx) => {
-                const num = activityCounter++;
+                activityCounter++;
                 const timeStr = act.startTime ? `${act.startTime}${act.endTime ? ' - ' + act.endTime : ''}` : '';
                 const city = getCity(act);
                 activitiesHtml += `
@@ -444,12 +539,18 @@ const Itinerary = (() => {
                         </div>
                     </div>
                 `;
-                // Distance gap to next activity
+                // Gap to next activity (haversine shown immediately, OSRM updates async)
                 const next = day.activities[actIdx + 1];
                 if (next && act.lat && act.lng && next.lat && next.lng) {
                     const km = haversineKm(act.lat, act.lng, next.lat, next.lng);
                     const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
-                    activitiesHtml += `<div class="activity-gap ${cls}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                    activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-${actIdx}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                }
+                // Gap from last activity back to lodging return point
+                if (actIdx === day.activities.length - 1 && ret && ret.lat && ret.lng && act.lat && act.lng) {
+                    const km = haversineKm(act.lat, act.lng, ret.lat, ret.lng);
+                    const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                    activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-ret"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
                 }
             });
 
@@ -486,6 +587,19 @@ const Itinerary = (() => {
 
         updateDayFilter();
         setupDragAndDrop();
+
+        // Async OSRM travel time — run days sequentially to avoid bursting the demo server
+        (async () => {
+            for (let dayIdx = 0; dayIdx < currentTrip.days.length; dayIdx++) {
+                const day = currentTrip.days[dayIdx];
+                const dep = day.lodgingDeparture || null;
+                const ret = day.lodgingReturn || null;
+                const hasGaps = day.activities.length > 1
+                    || (dep && dep.lat && day.activities[0]?.lat)
+                    || (ret && ret.lat && day.activities[day.activities.length - 1]?.lat);
+                if (hasGaps) await updateOsrmGaps(dayIdx, day.activities, dep, ret);
+            }
+        })();
 
         // Lodging banner + endpoint hover/click to highlight/focus marker
         document.querySelectorAll('.lodging-banner[data-marker-key], .lodging-endpoint[data-marker-key]').forEach(el => {
