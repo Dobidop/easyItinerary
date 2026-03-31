@@ -1565,6 +1565,7 @@ body {
 
 /* Leaflet overrides — theme-aware */
 .leaflet-container { background: var(--bg-secondary); }
+.leaflet-top.leaflet-left { top: 54px; } /* clear the map-controls bar */
 .leaflet-control-zoom a {
     background: var(--bg-card) !important;
     color: var(--text-primary) !important;
