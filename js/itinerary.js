@@ -517,8 +517,10 @@ const Itinerary = (() => {
                         ${act.startTime ? `<span class="activity-time-label">${act.startTime}</span>` : ''}
                         <div class="activity-marker ${act.category}"><i class="fa-solid ${getCategoryIcon(act.category)}"></i></div>
                         <div class="activity-top-row">
-                            <span class="activity-title">${escapeHtml(act.title)}</span>
-                            ${city ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(city)}</span>` : ''}
+                            <span class="activity-title-group">
+                                <span class="activity-title">${escapeHtml(act.title)}</span>
+                                ${city ? `<span class="location-label"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(city)}</span>` : ''}
+                            </span>
                             <span class="activity-time">${timeStr}</span>
                         </div>
                         <div class="activity-details">
