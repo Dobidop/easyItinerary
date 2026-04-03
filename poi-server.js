@@ -145,7 +145,9 @@ const JSON_FIELDS = `  name          - Official place name
   rating        - Rating score (e.g. 4.5)
   review_count  - Number of reviews
   cuisine       - Cuisine type (restaurants only)
-  description   - One-line description of the place`;
+  description   - One-line description of the place
+  lat           - Latitude as a decimal number (e.g. 48.8566)
+  lng           - Longitude as a decimal number (e.g. 2.3522)`;
 
 function buildPrompt(placeName, locationHint) {
     const loc = locationHint ? ` in ${locationHint}` : '';

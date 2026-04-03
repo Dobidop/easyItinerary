@@ -192,8 +192,13 @@ const Resources = (() => {
                 if (!document.getElementById('resourceTitle').value.trim()) {
                     document.getElementById('resourceTitle').value = data.name;
                 }
-                const query = data.name.match(/[A-Za-z0-9 ,.\-]+/g)?.map(s => s.trim()).filter(s => s.length > 2).join(' ').trim();
-                if (query) {
+                // Try Nominatim with full name first, then strip to ASCII as fallback
+                const queries = [
+                    data.name,
+                    data.name.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim(),
+                ].filter((q, i, arr) => q && q.length > 2 && arr.indexOf(q) === i);
+                let geocoded = false;
+                for (const query of queries) {
                     try {
                         const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
                             headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
@@ -206,11 +211,13 @@ const Resources = (() => {
                             fetchPlaceDetails(parseFloat(results[0].lat), parseFloat(results[0].lon)).then(details => {
                                 if (details) applyPlaceDetails(details);
                             });
-                            return;
+                            geocoded = true;
+                            break;
                         }
                     } catch {}
                 }
-                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Name found but no coordinates — pick location on map.';
+                if (geocoded) return;
+                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Name found but no coordinates — pick location on map or use <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance.';
                 setTimeout(() => hint.classList.remove('visible'), 5000);
                 return;
             }
@@ -344,6 +351,14 @@ const Resources = (() => {
         if (poi.category) {
             const mapped = catMap[poi.category];
             if (mapped && (!res.category || res.category === 'general')) res.category = mapped;
+        }
+        // Apply coordinates if the AI found them and the resource doesn't already have them
+        if (poi.lat && poi.lng && !res.lat) {
+            const lat = parseFloat(poi.lat), lng = parseFloat(poi.lng);
+            if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                res.lat = parseFloat(lat.toFixed(6));
+                res.lng = parseFloat(lng.toFixed(6));
+            }
         }
         delete res.pendingPoiJobId;
     }
