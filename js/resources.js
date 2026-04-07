@@ -43,7 +43,7 @@ const Resources = (() => {
         });
 
         // Auto-detect Google Maps URL on paste
-        document.getElementById('resourceUrl').addEventListener('paste', (e) => {
+        document.getElementById('resourceUrl').addEventListener('paste', () => {
             setTimeout(() => {
                 const url = document.getElementById('resourceUrl').value.trim();
                 if (isGoogleMapsUrl(url)) {
@@ -186,39 +186,60 @@ const Resources = (() => {
             }
 
             // URL has a place name but no coordinates (CID-based URL from mobile share)
-            // Try forward geocoding the address using the Latin-script parts of the name
             if (data.name) {
                 hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching for location...';
                 if (!document.getElementById('resourceTitle').value.trim()) {
                     document.getElementById('resourceTitle').value = data.name;
                 }
-                // Try Nominatim with full name first, then strip to ASCII as fallback
-                const queries = [
-                    data.name,
-                    data.name.replace(/[^\x00-\x7F]/g, ' ').replace(/\s+/g, ' ').trim(),
-                ].filter((q, i, arr) => q && q.length > 2 && arr.indexOf(q) === i);
-                let geocoded = false;
-                for (const query of queries) {
-                    try {
-                        const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
-                            headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
-                        });
-                        const results = await r.json();
-                        if (results.length) {
-                            document.getElementById('resourceLat').value = parseFloat(results[0].lat).toFixed(6);
-                            document.getElementById('resourceLng').value = parseFloat(results[0].lon).toFixed(6);
-                            hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(data.name)}</strong>`;
-                            fetchPlaceDetails(parseFloat(results[0].lat), parseFloat(results[0].lon)).then(details => {
-                                if (details) applyPlaceDetails(details);
-                            });
-                            geocoded = true;
-                            break;
-                        }
-                    } catch {}
+
+                // Derive a location bias from existing trip resources/activities
+                const tripCoords = (() => {
+                    const pts = [
+                        ...(currentTrip.resources || []).filter(r => r.lat && r.lng).map(r => ({ lat: r.lat, lng: r.lng })),
+                        ...(currentTrip.days || []).flatMap(d => d.activities.filter(a => a.lat && a.lng).map(a => ({ lat: a.lat, lng: a.lng }))),
+                    ];
+                    if (!pts.length) return null;
+                    return { lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length, lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length };
+                })();
+
+                // Photon: place-name geocoder with optional location bias — better than Nominatim for ambiguous names
+                const photonGeocode = async (q) => {
+                    const bias = tripCoords ? `&lat=${tripCoords.lat.toFixed(4)}&lon=${tripCoords.lng.toFixed(4)}` : '';
+                    const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1&lang=en${bias}`);
+                    const d = await r.json();
+                    const f = d.features?.[0];
+                    if (!f) return null;
+                    return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+                };
+
+                // Nominatim: more reliable for structured addresses
+                const nominatimGeocode = async (q) => {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
+                        headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
+                    });
+                    const d = await r.json();
+                    if (!d.length) return null;
+                    return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+                };
+
+                let found = null;
+                try { found = await photonGeocode(data.name); } catch {}
+                if (!found) { try { found = await nominatimGeocode(data.name); } catch {} }
+
+                if (found) {
+                    document.getElementById('resourceLat').value = found.lat.toFixed(6);
+                    document.getElementById('resourceLng').value = found.lng.toFixed(6);
+                    hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(data.name)}</strong>${tripCoords ? ' (location bias applied)' : ''}`;
+                    fetchPlaceDetails(found.lat, found.lng).then(details => {
+                        if (details) applyPlaceDetails(details);
+                    });
+                    return;
                 }
-                if (geocoded) return;
-                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Name found but no coordinates — pick location on map or use <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance.';
-                setTimeout(() => hint.classList.remove('visible'), 5000);
+
+                hint.innerHTML = poiServerAvailable
+                    ? '<i class="fa-solid fa-circle-info"></i> Save this resource then use <i class="fa-solid fa-wand-magic-sparkles"></i> Enhance — AI will find the coordinates.'
+                    : '<i class="fa-solid fa-circle-info"></i> Could not locate automatically — use Pick on Map to add coordinates.';
+                setTimeout(() => hint.classList.remove('visible'), 6000);
                 return;
             }
         }
@@ -242,14 +263,14 @@ const Resources = (() => {
             result.name = decodeURIComponent(placeNameMatch[1].replace(/\+/g, ' '));
         }
 
-        // Extract coordinates from various patterns
+        // Extract coordinates — !3d!4d is the pinned POI location, @lat,lng is just the viewport center
         const coordPatterns = [
-            /@(-?\d+\.?\d*),(-?\d+\.?\d*)/,           // @lat,lng
-            /!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/,       // !3dlat!4dlng (data params)
+            /!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/,       // !3dlat!4dlng — actual POI pin (highest priority)
             /place\/(-?\d+\.?\d*),(-?\d+\.?\d*)/,      // place/lat,lng
             /q=(-?\d+\.?\d*),(-?\d+\.?\d*)/,           // q=lat,lng
             /ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/,          // ll=lat,lng
             /center=(-?\d+\.?\d*),(-?\d+\.?\d*)/,      // center=lat,lng
+            /@(-?\d+\.?\d*),(-?\d+\.?\d*)/,            // @lat,lng — viewport center (fallback only)
         ];
 
         for (const pattern of coordPatterns) {
@@ -338,7 +359,7 @@ const Resources = (() => {
     const poiPollFailures = {}; // jobId -> consecutive failure count
     const POI_MAX_FAILURES = 30; // ~5 minutes of failures before giving up
 
-    function applyPOIResult(res, poi) {
+    async function applyPOIResult(res, poi) {
         const catMap = { food: 'restaurant', restaurant: 'restaurant', hotel: 'hotel', lodging: 'hotel', sightseeing: 'sightseeing', shopping: 'shopping' };
         if (poi.name) res.title = poi.name;
         if (poi.address) res.notes = poi.address;
@@ -359,6 +380,19 @@ const Resources = (() => {
                 res.lat = parseFloat(lat.toFixed(6));
                 res.lng = parseFloat(lng.toFixed(6));
             }
+        }
+        // If still no coordinates but we have an address, geocode it — far more reliable than name search
+        if (!res.lat && poi.address) {
+            try {
+                const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(poi.address)}&format=json&limit=1`, {
+                    headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
+                });
+                const results = await r.json();
+                if (results.length) {
+                    res.lat = parseFloat(parseFloat(results[0].lat).toFixed(6));
+                    res.lng = parseFloat(parseFloat(results[0].lon).toFixed(6));
+                }
+            } catch {}
         }
         delete res.pendingPoiJobId;
     }
@@ -394,7 +428,7 @@ const Resources = (() => {
                 poiPollFailures[jobId] = 0; // reset on success
                 const data = await r.json();
                 if (data.status === 'done' && data.result) {
-                    applyPOIResult(res, data.result);
+                    await applyPOIResult(res, data.result);
                     delete poiPollFailures[jobId];
                     changed = true;
                     showToast(`Enhanced: ${res.title}`);
