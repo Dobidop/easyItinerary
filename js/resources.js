@@ -45,12 +45,16 @@ const Resources = (() => {
         // Auto-detect Google Maps URL on paste
         document.getElementById('resourceUrl').addEventListener('paste', () => {
             setTimeout(() => {
-                const url = document.getElementById('resourceUrl').value.trim();
-                if (isGoogleMapsUrl(url)) {
-                    document.getElementById('resourceUrlHint').innerHTML = '<i class="fa-solid fa-lightbulb"></i> Google Maps link detected — click <strong>Fetch</strong> to extract location data';
-                    document.getElementById('resourceUrlHint').classList.add('visible');
+                const val = document.getElementById('resourceUrl').value.trim();
+                const hint = document.getElementById('resourceUrlHint');
+                if (isGoogleMapsUrl(val)) {
+                    hint.innerHTML = '<i class="fa-solid fa-lightbulb"></i> Google Maps link detected — click <strong>Fetch</strong> to extract location data';
+                    hint.classList.add('visible');
+                } else if (/^https?:\/\//i.test(val)) {
+                    hint.innerHTML = '<i class="fa-solid fa-lightbulb"></i> URL detected — click <strong>Fetch</strong> to extract details';
+                    hint.classList.add('visible');
                 } else {
-                    document.getElementById('resourceUrlHint').classList.remove('visible');
+                    hint.classList.remove('visible');
                 }
             }, 50);
         });
@@ -121,17 +125,95 @@ const Resources = (() => {
         return /google\.[a-z.]+\/maps|maps\.google|goo\.gl\/maps|maps\.app\.goo\.gl/i.test(url);
     }
 
-    /* ===== Fetch location data from URL ===== */
+    /* ===== Fetch location data from URL or plain-text place name ===== */
     async function fetchFromUrl() {
         let url = document.getElementById('resourceUrl').value.trim();
         if (!url) {
-            showToast('Paste a URL first');
+            showToast('Enter a URL or place name first');
             return;
         }
 
         const hint = document.getElementById('resourceUrlHint');
-        hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting location data...';
         hint.classList.add('visible');
+
+        // Plain-text query — not a URL — run name-based geocoding pipeline
+        if (!/^https?:\/\//i.test(url)) {
+            const query = url;
+            hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching for place...';
+
+            const tripCoords = (() => {
+                const pts = [
+                    ...(currentTrip.resources || []).filter(r => r.lat && r.lng).map(r => ({ lat: r.lat, lng: r.lng })),
+                    ...(currentTrip.days || []).flatMap(d => d.activities.filter(a => a.lat && a.lng).map(a => ({ lat: a.lat, lng: a.lng }))),
+                ];
+                if (!pts.length) return null;
+                return { lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length, lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length };
+            })();
+
+            let found = null;
+            try {
+                const bias = tripCoords ? `&lat=${tripCoords.lat.toFixed(4)}&lon=${tripCoords.lng.toFixed(4)}` : '';
+                const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en${bias}`);
+                const d = await r.json();
+                const f = d.features?.[0];
+                if (f) found = { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], name: f.properties?.name };
+            } catch {}
+
+            if (!found) {
+                try {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
+                        headers: { 'Accept-Language': 'en', 'User-Agent': 'EasyItinerary/1.0' },
+                    });
+                    const d = await r.json();
+                    if (d.length) found = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), name: d[0].display_name?.split(',')[0] };
+                } catch {}
+            }
+
+            if (found) {
+                document.getElementById('resourceLat').value = found.lat.toFixed(6);
+                document.getElementById('resourceLng').value = found.lng.toFixed(6);
+                if (!document.getElementById('resourceTitle').value.trim() && found.name) {
+                    document.getElementById('resourceTitle').value = found.name;
+                }
+                hint.innerHTML = `<i class="fa-solid fa-check"></i> Found: <strong>${escapeHtml(found.name || query)}</strong>`;
+                fetchPlaceDetails(found.lat, found.lng).then(details => { if (details) applyPlaceDetails(details); });
+                return;
+            }
+
+            // Geocoding failed — try POI server with a Google Search URL as the query
+            if (poiServerAvailable) {
+                const searchUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+                document.getElementById('resourceUrl').value = searchUrl;
+                if (!document.getElementById('resourceTitle').value.trim()) {
+                    document.getElementById('resourceTitle').value = query;
+                }
+                hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching with AI...';
+                try {
+                    const submitRes = await fetch('/api/poi', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: searchUrl }),
+                    });
+                    const { jobId } = await submitRes.json();
+                    const res = (currentTrip.resources || []).find(r => r.id === document.getElementById('resourceUrl').dataset.editingId);
+                    if (res) {
+                        res.pendingPoiJobId = jobId;
+                        Storage.saveTrip(currentTrip);
+                        startPoiPolling();
+                    }
+                    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> AI is searching — save now, details will fill in automatically.';
+                } catch {
+                    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Not found — try a more specific name or add a country/city.';
+                }
+                setTimeout(() => hint.classList.remove('visible'), 6000);
+            } else {
+                hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Not found — try adding a city name, or use Pick on Map.';
+                setTimeout(() => hint.classList.remove('visible'), 5000);
+            }
+            return;
+        }
+
+        hint.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Extracting location data...';
 
         // Resolve short URLs (goo.gl/maps, maps.app.goo.gl) server-side
         if (/goo\.gl\/maps|maps\.app\.goo\.gl/i.test(url)) {
