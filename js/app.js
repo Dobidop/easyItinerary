@@ -149,9 +149,15 @@ const App = (() => {
         });
 
         // Mobile map toggle (3 states: default 35vh → minimized → expanded 70vh → default)
-        document.getElementById('mobileMapToggle').addEventListener('click', () => {
+        document.getElementById('mobileMapToggle').addEventListener('click', (e) => {
+            if (e.target.closest('#btnExpandMap')) return; // handled separately
             const mapPanel = document.querySelector('.right-panel');
             const toggle = document.getElementById('mobileMapToggle');
+            // If map is expanded, collapse back to normal first
+            if (document.body.classList.contains('map-expanded')) {
+                document.body.classList.remove('map-expanded');
+                document.getElementById('btnExpandMap').querySelector('i').className = 'fa-solid fa-expand';
+            }
             if (mapPanel.classList.contains('map-minimized')) {
                 mapPanel.classList.remove('map-minimized');
                 toggle.classList.remove('flipped');
@@ -160,6 +166,23 @@ const App = (() => {
                 mapPanel.classList.add('map-minimized');
                 toggle.classList.add('flipped');
                 toggle.querySelector('span').textContent = 'Show Map';
+            }
+            setTimeout(() => MapModule.invalidateSize(), 350);
+        });
+
+        document.getElementById('btnExpandMap').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const mapPanel = document.querySelector('.right-panel');
+            const isExpanded = document.body.classList.toggle('map-expanded');
+            const expandIcon = document.getElementById('btnExpandMap').querySelector('i');
+            if (isExpanded) {
+                // Ensure map is visible when expanding
+                mapPanel.classList.remove('map-minimized');
+                document.getElementById('mobileMapToggle').classList.remove('flipped');
+                document.getElementById('mobileMapToggle').querySelector('span').textContent = 'Map';
+                expandIcon.className = 'fa-solid fa-compress';
+            } else {
+                expandIcon.className = 'fa-solid fa-expand';
             }
             setTimeout(() => MapModule.invalidateSize(), 350);
         });

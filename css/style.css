@@ -1918,12 +1918,35 @@ body {
         min-height: 0;
         overflow: hidden;
     }
+    body.map-expanded .left-panel {
+        display: none;
+    }
+    body.map-expanded .right-panel {
+        height: calc(100dvh - 44px - 36px); /* viewport minus top-bar and toggle bar */
+        flex: 1 1 auto;
+    }
 
     /* Mobile map toggle */
     .mobile-map-toggle {
         display: flex !important;
         padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+        justify-content: center;
+        position: relative;
     }
+    .map-expand-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        padding: 4px 6px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .map-expand-btn:hover { color: var(--text-primary); }
 
     /* Top bar mobile — icon-only buttons, no text overflow */
     .top-bar { padding: 6px 8px; height: 44px; overflow: hidden; }
