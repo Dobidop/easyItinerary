@@ -328,6 +328,7 @@ body {
 
 .section { display: none; }
 .section.active { display: block; }
+#sectionItinerary.active { display: flex; flex-direction: row; align-items: flex-start; gap: 0; }
 
 .section-header {
     display: flex;
@@ -572,6 +573,71 @@ body {
 }
 
 /* ===== Itinerary ===== */
+.itinerary-main { flex: 1; min-width: 0; }
+
+.day-scroll {
+    width: 40px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100dvh - 88px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 2px 0;
+    margin-right: 10px;
+    border-right: 1px solid var(--border);
+}
+.day-scroll::-webkit-scrollbar { display: none; }
+.day-scroll:empty { display: none; }
+
+.day-scroll-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 3px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    line-height: 1.2;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
+    min-height: 34px;
+}
+.day-scroll-item:hover { background: var(--bg-hover); }
+.day-scroll-item.in-view {
+    background: var(--accent-light);
+}
+.dsi-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: block;
+    line-height: 1;
+}
+.day-scroll-item.in-view .dsi-num { color: var(--accent); }
+.dsi-mon {
+    font-size: 8px;
+    color: var(--text-muted);
+    display: block;
+    line-height: 1;
+    margin-top: 2px;
+}
+.dsi-day {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: block;
+    line-height: 1;
+}
+.day-scroll-item.in-view .dsi-mon,
+.day-scroll-item.in-view .dsi-day { color: var(--accent); opacity: 0.85; }
+
 .itinerary-days { }
 
 .day-card {
@@ -1894,6 +1960,8 @@ body {
 @media (max-width: 768px) {
     /* Prevent horizontal overflow */
     html, body { overflow-x: hidden; }
+
+    .day-scroll { display: none; }
 
     .main-layout { flex-direction: column; }
     .left-panel {

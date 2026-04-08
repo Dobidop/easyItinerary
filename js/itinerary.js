@@ -608,6 +608,7 @@ const Itinerary = (() => {
         }).join('');
 
         updateDayFilter();
+        updateDayScroll();
         setupDragAndDrop();
 
         // Async OSRM travel time — run days sequentially to avoid bursting the demo server
@@ -642,6 +643,65 @@ const Itinerary = (() => {
     function toggleDay(dayIdx) {
         const card = document.querySelector(`.day-card[data-day="${dayIdx}"]`);
         if (card) card.classList.toggle('collapsed');
+    }
+
+    let dayScrollObserver = null;
+
+    function updateDayScroll() {
+        const sidebar = document.getElementById('dayScroll');
+        if (!sidebar) return;
+
+        if (!currentTrip || !currentTrip.days.length) {
+            sidebar.innerHTML = '';
+            return;
+        }
+
+        sidebar.innerHTML = currentTrip.days.map((day, idx) => {
+            let dateHtml = '';
+            if (day.date) {
+                const [y, m, d] = day.date.split('-').map(Number);
+                const dt = new Date(y, m - 1, d);
+                const mon = dt.toLocaleString('default', { month: 'short' });
+                dateHtml = `<span class="dsi-mon">${mon}</span><span class="dsi-day">${d}</span>`;
+            }
+            return `<div class="day-scroll-item" data-scroll-day="${idx}" title="Day ${idx + 1}${day.date ? ' — ' + day.date : ''}" onclick="Itinerary.scrollToDay(${idx})">
+                <span class="dsi-num">${idx + 1}</span>
+                ${dateHtml}
+            </div>`;
+        }).join('');
+
+        // Disconnect previous observer
+        if (dayScrollObserver) dayScrollObserver.disconnect();
+
+        const panelContent = document.querySelector('.panel-content');
+        if (!panelContent) return;
+
+        dayScrollObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const dayIdx = entry.target.dataset.day;
+                const pill = sidebar.querySelector(`[data-scroll-day="${dayIdx}"]`);
+                if (pill) pill.classList.toggle('in-view', entry.isIntersecting);
+            });
+        }, { root: panelContent, threshold: 0.1 });
+
+        document.querySelectorAll('#itineraryDays .day-card').forEach(card => {
+            dayScrollObserver.observe(card);
+        });
+    }
+
+    function scrollToDay(idx) {
+        const card = document.querySelector(`#itineraryDays .day-card[data-day="${idx}"]`);
+        if (!card) return;
+        if (card.classList.contains('collapsed')) card.classList.remove('collapsed');
+        const panelContent = document.querySelector('.panel-content');
+        if (panelContent) {
+            const containerRect = panelContent.getBoundingClientRect();
+            const cardRect = card.getBoundingClientRect();
+            panelContent.scrollTo({
+                top: panelContent.scrollTop + (cardRect.top - containerRect.top) - 8,
+                behavior: 'smooth',
+            });
+        }
     }
 
     function showOnMap(lat, lng) {
@@ -853,6 +913,7 @@ const Itinerary = (() => {
         saveActivity,
         deleteActivity,
         toggleDay,
+        scrollToDay,
         showOnMap,
         filterMapToDay,
         setLodgingEndpoint,
