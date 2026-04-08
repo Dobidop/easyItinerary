@@ -64,34 +64,54 @@ const Itinerary = (() => {
 
     function generateDaysFromDates() {
         if (!currentTrip.startDate || !currentTrip.endDate) return;
-        const start = new Date(currentTrip.startDate);
-        const end = new Date(currentTrip.endDate);
+        const [sy, sm, sd] = currentTrip.startDate.split('-').map(Number);
+        const [ey, em, ed] = currentTrip.endDate.split('-').map(Number);
+        const start = new Date(sy, sm - 1, sd);
+        const end = new Date(ey, em - 1, ed);
         if (start > end) return;
 
-        const existingDays = currentTrip.days.length;
-        const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Only add missing days
-        for (let i = existingDays; i < totalDays; i++) {
-            const date = new Date(start);
-            date.setDate(date.getDate() + i);
-            currentTrip.days.push({
-                date: date.toISOString().split('T')[0],
-                label: '',
-                activities: [],
-            });
+        // Index existing days by their stored date so we can preserve activities
+        const daysByDate = {};
+        currentTrip.days.forEach(day => {
+            if (day.date) daysByDate[day.date] = day;
+        });
+
+        // Count activities that will be dropped (days outside the new range)
+        let droppedActivities = 0;
+        currentTrip.days.forEach(day => {
+            if (!day.date || !day.activities?.length) return;
+            const [dy, dm, dd] = day.date.split('-').map(Number);
+            const dayD = new Date(dy, dm - 1, dd);
+            if (dayD < start || dayD > end) droppedActivities += day.activities.length;
+        });
+
+        // Rebuild days array covering exactly the new date range
+        const newDays = [];
+        for (let i = 0; i < totalDays; i++) {
+            const d = new Date(sy, sm - 1, sd + i);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            newDays.push(daysByDate[dateStr] || { date: dateStr, label: '', activities: [] });
         }
+
+        currentTrip.days = newDays;
         Storage.saveTrip(currentTrip);
         render();
+        App.updateStats();
+
+        if (droppedActivities > 0) {
+            showToast(`${droppedActivities} activit${droppedActivities === 1 ? 'y' : 'ies'} on removed days were dropped.`);
+        }
     }
 
     function addDay() {
         const lastDay = currentTrip.days[currentTrip.days.length - 1];
         let nextDate = '';
         if (lastDay && lastDay.date) {
-            const d = new Date(lastDay.date);
-            d.setDate(d.getDate() + 1);
-            nextDate = d.toISOString().split('T')[0];
+            const [ly, lm, ld] = lastDay.date.split('-').map(Number);
+            const d = new Date(ly, lm - 1, ld + 1);
+            nextDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         } else if (currentTrip.startDate) {
             nextDate = currentTrip.startDate;
         }

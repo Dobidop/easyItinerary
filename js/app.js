@@ -775,16 +775,8 @@ const App = (() => {
         container.innerHTML = days.map((day, idx) => {
             const count = (day.activities || []).length;
 
-            // Derive calendar date for this day (if trip has startDate)
-            // Use local date arithmetic to avoid UTC timezone shifts
-            let dayDate = null;
-            if (currentTrip.startDate) {
-                const [y, m, d] = currentTrip.startDate.split('-').map(Number);
-                const start = new Date(y, m - 1, d + idx);
-                const mm = String(start.getMonth() + 1).padStart(2, '0');
-                const dd = String(start.getDate()).padStart(2, '0');
-                dayDate = `${start.getFullYear()}-${mm}-${dd}`;
-            }
+            // Use the day's stored date as the authoritative calendar date
+            const dayDate = day.date || null;
 
             const anchor = dayDate ? (anchors[dayDate] || {}) : {};
             const hasFlight  = !!anchor.flight;
