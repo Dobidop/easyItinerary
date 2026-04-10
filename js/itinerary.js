@@ -648,6 +648,7 @@ const Itinerary = (() => {
                             <div>
                                 <div class="day-title">Day ${dayIdx + 1}${day.label ? ' — ' + escapeHtml(day.label) : ''}</div>
                                 <div class="day-date">${formatDate(day.date)} <span class="day-summary">${actCount} ${actCount === 1 ? 'activity' : 'activities'}${(() => { const lvl = dayLoadLevel(day.activities); const spread = daySpreadKm(day.activities); return lvl ? `<span class="day-load-badge ${lvl}" title="${actCount} activities, ${spread > 0 ? formatDistance(spread) + ' spread' : 'no location data'}"></span>` : ''; })()}</span></div>
+                                ${day.date ? `<div class="day-weather" data-weather-date="${day.date}"></div>` : ''}
                             </div>
                         </div>
                         <div class="day-header-actions">
@@ -673,6 +674,7 @@ const Itinerary = (() => {
 
         updateDayFilter();
         updateDayScroll();
+        if (typeof Weather !== 'undefined') Weather.renderOnly();
         setupDragAndDrop();
 
         // Async OSRM travel time — run days sequentially to avoid bursting the demo server

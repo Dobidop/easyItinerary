@@ -35,6 +35,7 @@ const App = (() => {
         Itinerary.init(currentTrip);
         Budget.init(currentTrip);
         Resources.init(currentTrip);
+        Weather.init(currentTrip);
 
         // Populate UI
         populateTripSelector();
@@ -731,6 +732,7 @@ const App = (() => {
         document.getElementById('statLinks').textContent = totalLinks;
 
         renderDayPlanStrip();
+        Weather.update(currentTrip);
     }
 
     // ===== Day Plan Strip =====
@@ -871,10 +873,11 @@ const App = (() => {
             const fullLabel = (day.label || `Day ${idx + 1}`).replace(/"/g, '&quot;');
             const actWord = count !== 1 ? 'activities' : 'activity';
             const anchorNote = hasAnyAnchor ? ' · reservation' : '';
-            return `<div class="day-plan-tile status-${status}" onclick="App.jumpToDay(${idx})" title="${fullLabel}: ${count} ${actWord}${anchorNote}${dayLocation ? ' · ' + dayLocation : ''}">
+            return `<div class="day-plan-tile status-${status}" data-weather-date="${dayDate || ''}" onclick="App.jumpToDay(${idx})" title="${fullLabel}: ${count} ${actWord}${anchorNote}${dayLocation ? ' · ' + dayLocation : ''}">
                 <span class="dpt-label">${label}</span>
                 <span class="dpt-count">${countDisplay}</span>
                 ${locationStr ? `<span class="dpt-loc">${escapeHtml(locationStr)}</span>` : '<span class="dpt-loc"></span>'}
+                <span class="dpt-weather"></span>
                 <span class="dpt-anchors">${anchorIcons}</span>
             </div>`;
         }).join('');
@@ -925,6 +928,7 @@ const App = (() => {
         Itinerary.update(currentTrip);
         Budget.update(currentTrip);
         Resources.update(currentTrip);
+        Weather.init(currentTrip);
         updateStats();
         MapModule.updateMarkers(currentTrip, 'all');
     }

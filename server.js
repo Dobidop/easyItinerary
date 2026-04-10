@@ -18,7 +18,7 @@ const CSP = [
     "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
     "img-src 'self' data: https: blob:",
     "font-src 'self' https://cdnjs.cloudflare.com",
-    "connect-src 'self' https://nominatim.openstreetmap.org https://photon.komoot.io https://overpass-api.de https://router.project-osrm.org",
+    "connect-src 'self' https://nominatim.openstreetmap.org https://photon.komoot.io https://overpass-api.de https://router.project-osrm.org https://api.open-meteo.com https://archive-api.open-meteo.com",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
