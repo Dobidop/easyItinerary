@@ -13,6 +13,10 @@ const Itinerary = (() => {
     function bindEvents() {
         document.getElementById('btnAddDay').addEventListener('click', addDay);
         document.getElementById('btnSaveActivity').addEventListener('click', saveActivity);
+        document.getElementById('activityCost').addEventListener('input', (e) => {
+            const row = document.getElementById('activityExcludeBudgetRow');
+            if (row) row.style.display = parseFloat(e.target.value) > 0 ? '' : 'none';
+        });
         document.getElementById('btnPickLocation').addEventListener('click', () => {
             MapModule.enablePickMode((lat, lng) => {
                 document.getElementById('activityLat').value = lat.toFixed(6);
@@ -149,6 +153,7 @@ const Itinerary = (() => {
             document.getElementById('activityStartTime').value = act.startTime || '';
             document.getElementById('activityEndTime').value = act.endTime || '';
             document.getElementById('activityCost').value = act.cost || '';
+            document.getElementById('activityExcludeBudget').checked = !!act.excludeFromBudget;
             document.getElementById('activityDescription').value = act.description || '';
             document.getElementById('activityLink').value = act.link || '';
             document.getElementById('activityAddress').value = act.address || '';
@@ -162,6 +167,7 @@ const Itinerary = (() => {
             document.getElementById('activityStartTime').value = '';
             document.getElementById('activityEndTime').value = '';
             document.getElementById('activityCost').value = '';
+            document.getElementById('activityExcludeBudget').checked = false;
             document.getElementById('activityDescription').value = '';
             document.getElementById('activityLink').value = '';
             document.getElementById('activityAddress').value = '';
@@ -169,6 +175,11 @@ const Itinerary = (() => {
             document.getElementById('activityLng').value = '';
             activityPicker.clear();
         }
+
+        // Show/hide exclude-from-budget checkbox based on whether cost is set
+        const excludeRow = document.getElementById('activityExcludeBudgetRow');
+        const costVal = parseFloat(document.getElementById('activityCost').value);
+        if (excludeRow) excludeRow.style.display = costVal > 0 ? '' : 'none';
 
         // Show nudge toward resource linking only when adding a new activity
         // and there are shortlisted resources available to link
@@ -197,6 +208,7 @@ const Itinerary = (() => {
             startTime: document.getElementById('activityStartTime').value,
             endTime: document.getElementById('activityEndTime').value,
             cost: parseFloat(document.getElementById('activityCost').value) || 0,
+            excludeFromBudget: document.getElementById('activityExcludeBudget').checked,
             description: document.getElementById('activityDescription').value,
             link: document.getElementById('activityLink').value,
             address: document.getElementById('activityAddress').value,
@@ -420,9 +432,19 @@ const Itinerary = (() => {
             if (last) segments.push({ lat1: last.lat, lng1: last.lng, lat2: ret.lat, lng2: ret.lng, gapId: `${dayIdx}-ret` });
         }
 
+        const day = currentTrip.days[dayIdx];
+        const overrides = day.gapOverrides || {};
+
         for (const seg of segments) {
             const el = document.querySelector(`.activity-gap[data-gap="${seg.gapId}"]`);
             if (!el) continue;
+
+            // If user has set a manual time override, show it without fetching OSRM
+            if (overrides[seg.gapId] !== undefined) {
+                renderGapOverride(el, seg.gapId, dayIdx, overrides[seg.gapId]);
+                continue;
+            }
+
             const straightKm = haversineKm(seg.lat1, seg.lng1, seg.lat2, seg.lng2);
             if (straightKm > 800) continue; // skip — likely a flight, no meaningful driving route
             const isWalkable = straightKm < 2;
@@ -436,8 +458,34 @@ const Itinerary = (() => {
                 ? '<i class="fa-solid fa-person-walking"></i>'
                 : '<i class="fa-solid fa-car"></i>';
             el.className = `activity-gap ${cls}`;
-            el.innerHTML = `${icon} ${formatOsrmGap(result, isWalkable)}`;
+            el.innerHTML = `${icon} ${formatOsrmGap(result, isWalkable)} <button class="gap-edit-btn" title="Override travel time" onclick="Itinerary.promptGapOverride(${dayIdx},'${seg.gapId}',${Math.round(isWalkable ? (result.distance/1000/5*60) : result.duration/60)})"><i class="fa-solid fa-pen-to-square"></i></button>`;
         }
+    }
+
+    function renderGapOverride(el, gapId, dayIdx, minutes) {
+        el.className = 'activity-gap gap-overridden';
+        el.innerHTML = `<i class="fa-solid fa-person-walking"></i> ~${minutes}\u00a0min <span class="gap-override-tag">custom</span><button class="gap-edit-btn" title="Edit override" onclick="Itinerary.promptGapOverride(${dayIdx},'${gapId}',${minutes})"><i class="fa-solid fa-pen-to-square"></i></button><button class="gap-edit-btn gap-clear-btn" title="Clear override" onclick="Itinerary.clearGapOverride(${dayIdx},'${gapId}')"><i class="fa-solid fa-xmark"></i></button>`;
+    }
+
+    function promptGapOverride(dayIdx, gapId, currentMins) {
+        const input = prompt('Travel time in minutes:', currentMins ?? '');
+        if (input === null) return;
+        const mins = parseInt(input);
+        if (isNaN(mins) || mins < 0) return;
+        const day = currentTrip.days[dayIdx];
+        if (!day.gapOverrides) day.gapOverrides = {};
+        day.gapOverrides[gapId] = mins;
+        Storage.saveTrip(currentTrip);
+        const el = document.querySelector(`.activity-gap[data-gap="${gapId}"]`);
+        if (el) renderGapOverride(el, gapId, dayIdx, mins);
+    }
+
+    function clearGapOverride(dayIdx, gapId) {
+        const day = currentTrip.days[dayIdx];
+        if (day.gapOverrides) delete day.gapOverrides[gapId];
+        Storage.saveTrip(currentTrip);
+        // Re-render so OSRM fetches again
+        render();
     }
 
     function getCategoryIcon(cat) {
@@ -521,12 +569,18 @@ const Itinerary = (() => {
             }).join('');
 
             let activitiesHtml = '';
+            const gapOverrides = day.gapOverrides || {};
             // Gap from lodging departure to first activity
             const firstAct = day.activities[0];
             if (dep && dep.lat && dep.lng && firstAct && firstAct.lat && firstAct.lng) {
-                const km = haversineKm(dep.lat, dep.lng, firstAct.lat, firstAct.lng);
-                const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
-                activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-dep"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                const gapId = `${dayIdx}-dep`;
+                if (gapOverrides[gapId] !== undefined) {
+                    activitiesHtml += `<div class="activity-gap gap-overridden" data-gap="${gapId}"><i class="fa-solid fa-person-walking"></i> ~${gapOverrides[gapId]}\u00a0min <span class="gap-override-tag">custom</span><button class="gap-edit-btn" title="Edit override" onclick="Itinerary.promptGapOverride(${dayIdx},'${gapId}',${gapOverrides[gapId]})"><i class="fa-solid fa-pen-to-square"></i></button><button class="gap-edit-btn gap-clear-btn" title="Clear override" onclick="Itinerary.clearGapOverride(${dayIdx},'${gapId}')"><i class="fa-solid fa-xmark"></i></button></div>`;
+                } else {
+                    const km = haversineKm(dep.lat, dep.lng, firstAct.lat, firstAct.lng);
+                    const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                    activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${gapId}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                }
             }
             day.activities.forEach((act, actIdx) => {
                 activityCounter++;
@@ -564,15 +618,25 @@ const Itinerary = (() => {
                 // Gap to next activity (haversine shown immediately, OSRM updates async)
                 const next = day.activities[actIdx + 1];
                 if (next && act.lat && act.lng && next.lat && next.lng) {
-                    const km = haversineKm(act.lat, act.lng, next.lat, next.lng);
-                    const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
-                    activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-${actIdx}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                    const gapId = `${dayIdx}-${actIdx}`;
+                    if (gapOverrides[gapId] !== undefined) {
+                        activitiesHtml += `<div class="activity-gap gap-overridden" data-gap="${gapId}"><i class="fa-solid fa-person-walking"></i> ~${gapOverrides[gapId]}\u00a0min <span class="gap-override-tag">custom</span><button class="gap-edit-btn" title="Edit override" onclick="Itinerary.promptGapOverride(${dayIdx},'${gapId}',${gapOverrides[gapId]})"><i class="fa-solid fa-pen-to-square"></i></button><button class="gap-edit-btn gap-clear-btn" title="Clear override" onclick="Itinerary.clearGapOverride(${dayIdx},'${gapId}')"><i class="fa-solid fa-xmark"></i></button></div>`;
+                    } else {
+                        const km = haversineKm(act.lat, act.lng, next.lat, next.lng);
+                        const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                        activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${gapId}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                    }
                 }
                 // Gap from last activity back to lodging return point
                 if (actIdx === day.activities.length - 1 && ret && ret.lat && ret.lng && act.lat && act.lng) {
-                    const km = haversineKm(act.lat, act.lng, ret.lat, ret.lng);
-                    const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
-                    activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${dayIdx}-ret"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                    const gapId = `${dayIdx}-ret`;
+                    if (gapOverrides[gapId] !== undefined) {
+                        activitiesHtml += `<div class="activity-gap gap-overridden" data-gap="${gapId}"><i class="fa-solid fa-person-walking"></i> ~${gapOverrides[gapId]}\u00a0min <span class="gap-override-tag">custom</span><button class="gap-edit-btn" title="Edit override" onclick="Itinerary.promptGapOverride(${dayIdx},'${gapId}',${gapOverrides[gapId]})"><i class="fa-solid fa-pen-to-square"></i></button><button class="gap-edit-btn gap-clear-btn" title="Clear override" onclick="Itinerary.clearGapOverride(${dayIdx},'${gapId}')"><i class="fa-solid fa-xmark"></i></button></div>`;
+                    } else {
+                        const km = haversineKm(act.lat, act.lng, ret.lat, ret.lng);
+                        const cls = km >= 8 ? 'red' : km >= 2 ? 'amber' : '';
+                        activitiesHtml += `<div class="activity-gap ${cls}" data-gap="${gapId}"><i class="fa-solid fa-arrow-down"></i>${formatDistance(km)}</div>`;
+                    }
                 }
             });
 
@@ -863,6 +927,56 @@ const Itinerary = (() => {
         }
     }
 
+    function autoAssignLodgingEndpoints(reservation) {
+        if (reservation.type !== 'hotel') return 0;
+        if (!reservation.checkIn || !reservation.checkOut) return 0;
+
+        // Resolve coordinates from linked resource (or title match)
+        let lat = null, lng = null, resourceId = null;
+        let resource = null;
+        if (reservation.linkedResourceId) {
+            resource = (currentTrip.resources || []).find(r => r.id === reservation.linkedResourceId);
+        }
+        if (!resource || !resource.lat) {
+            resource = (currentTrip.resources || []).find(r =>
+                r.lat && r.lng && r.title && reservation.title &&
+                (r.title.includes(reservation.title) || reservation.title.includes(r.title))
+            );
+        }
+        if (resource && resource.lat && resource.lng) {
+            lat = resource.lat;
+            lng = resource.lng;
+            resourceId = resource.id;
+        }
+
+        const resIdx = currentTrip.reservations.indexOf(reservation);
+        let assigned = 0;
+
+        currentTrip.days.forEach(day => {
+            if (!day.date) return;
+            if (day.date < reservation.checkIn || day.date > reservation.checkOut) return;
+
+            const isCheckIn  = day.date === reservation.checkIn;
+            const isCheckOut = day.date === reservation.checkOut;
+
+            // Check-in day: set return only (arriving at hotel in evening)
+            // Check-out day: set departure only (leaving hotel in morning)
+            // Intermediate days: set both
+            const setDep = !isCheckIn;   // depart from hotel unless it's arrival day
+            const setRet = !isCheckOut;  // return to hotel unless it's departure day
+
+            const endpoint = { reservationIdx: resIdx, title: reservation.title, time: '' };
+            if (lat) { endpoint.lat = lat; endpoint.lng = lng; endpoint.resourceId = resourceId; }
+
+            let changed = false;
+            if (setDep && !day.lodgingDeparture) { day.lodgingDeparture = { ...endpoint }; changed = true; }
+            if (setRet && !day.lodgingReturn)    { day.lodgingReturn    = { ...endpoint }; changed = true; }
+            if (changed) assigned++;
+        });
+
+        return assigned;
+    }
+
     function getLodgingCity(res) {
         if (res.linkedResourceId && currentTrip.resources) {
             const linked = currentTrip.resources.find(r => r.id === res.linkedResourceId);
@@ -918,5 +1032,8 @@ const Itinerary = (() => {
         filterMapToDay,
         setLodgingEndpoint,
         setLodgingTime,
+        autoAssignLodgingEndpoints,
+        promptGapOverride,
+        clearGapOverride,
     };
 })();

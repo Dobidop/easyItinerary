@@ -119,7 +119,8 @@ const Budget = (() => {
 
     function getActivityTotal() {
         return (currentTrip.days || []).reduce((daySum, day) =>
-            daySum + day.activities.reduce((actSum, act) => actSum + (act.cost || 0), 0), 0);
+            daySum + day.activities.reduce((actSum, act) =>
+                actSum + (act.excludeFromBudget ? 0 : (act.cost || 0)), 0), 0);
     }
 
     function getCategoryTotals() {
@@ -140,11 +141,11 @@ const Budget = (() => {
             }
         });
 
-        // Activity costs — map to budget categories
+        // Activity costs — map to budget categories (skip excluded)
         const actCatMap = { food: 'food', sightseeing: 'activities', activity: 'activities', transport: 'transport', lodging: 'accommodation', shopping: 'shopping', other: 'other' };
         (currentTrip.days || []).forEach(day => {
             day.activities.forEach(act => {
-                if (act.cost) {
+                if (act.cost && !act.excludeFromBudget) {
                     const cat = actCatMap[act.category] || 'other';
                     totals[cat] = (totals[cat] || 0) + act.cost;
                 }

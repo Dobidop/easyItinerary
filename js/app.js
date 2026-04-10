@@ -547,6 +547,16 @@ const App = (() => {
         }
 
         Storage.saveTrip(currentTrip);
+
+        // Auto-assign hotel as lodging endpoint for days not already set
+        if (reservation.type === 'hotel') {
+            const assigned = Itinerary.autoAssignLodgingEndpoints(reservation);
+            if (assigned > 0) {
+                Storage.saveTrip(currentTrip);
+                showToast(`Lodging auto-set as endpoint for ${assigned} day${assigned === 1 ? '' : 's'}`);
+            }
+        }
+
         document.getElementById('reservationModal').classList.remove('open');
         editingReservationIdx = null;
         renderReservations();
